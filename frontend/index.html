@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trader Skill - Binance, Alpaca (US) & B3 MT5</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lightweight Charts (TradingView) -->
+  <script src="/static/lightweight-charts.standalone.production.js"></script>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            binance: '#F3BA2F',
+            binanceHover: '#e0a722',
+            alpaca: '#FACC15',
+            darkBg: '#090d16',
+            cardBg: '#111726',
+            cardBorder: '#1e293b',
+            accentGreen: '#0ECB81',
+            accentRed: '#F6465D',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #090d16; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    .badge-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col">
+
+  <!-- TOP HEADER -->
+  <header class="bg-cardBg border-b border-cardBorder sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+      
+      <!-- Logo & Mode -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-lg bg-binance/10 border border-binance/30 flex items-center justify-center text-binance text-2xl font-bold">
+          <i class="ph-bold ph-trend-up"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-lg font-bold tracking-tight text-white">Trader Skill</h1>
+            <span id="headerModeBadge" class="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 badge-pulse"></span>
+              <span id="modeText">MULTI-BROKER CONECTADO</span>
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Binance Spot (5 Criptos) • Alpaca (US) • MetaTrader 5 (B3)</p>
+        </div>
+      </div>
+
+      <!-- Live Quick Stats -->
+      <div class="hidden md:flex items-center space-x-6 text-sm">
+        <div>
+          <div class="text-xs text-slate-400">Orçamento Definido</div>
+          <div id="statBudget" class="font-bold text-white mono">$100.00</div>
+        </div>
+        <div class="h-8 w-px bg-cardBorder"></div>
+        <div>
+          <div class="text-xs text-slate-400">Saldo Binance (USDT)</div>
+          <div id="statUsdtBalance" class="font-bold text-binance mono">$0.00</div>
+        </div>
+        <div class="h-8 w-px bg-cardBorder"></div>
+        <div>
+          <div class="text-xs text-slate-400">Trades Executados</div>
+          <div id="statTradesCount" class="font-bold text-emerald-400 mono">0</div>
+        </div>
+        <div class="h-8 w-px bg-cardBorder"></div>
+        <div class="cursor-pointer" onclick="switchTab('settings')" title="Gerenciar Modo Automático">
+          <div class="text-xs text-slate-400 flex items-center gap-1.5">
+            <span>Bot Automático</span>
+            <span id="autoTraderHeaderDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+          </div>
+          <div id="statAutoTrading" class="font-bold text-slate-400 mono text-xs">DESATIVADO</div>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="flex items-center space-x-3">
+        <button onclick="refreshData()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Atualizar Dados">
+          <i class="ph-bold ph-arrows-clockwise text-lg"></i>
+        </button>
+        <button onclick="switchTab('settings')" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-binance hover:bg-binanceHover text-slate-950 font-semibold text-xs transition shadow-lg shadow-binance/20">
+          <i class="ph-bold ph-gear text-base"></i>
+          <span>Configurações</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TICKER TAPE -->
+    <div class="bg-darkBg/90 border-t border-cardBorder px-4 py-2 overflow-x-auto whitespace-nowrap">
+      <div id="tickerTape" class="flex items-center space-x-6 text-xs mono">
+        <span class="text-slate-500">Carregando cotações ao vivo...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN NAVIGATION TABS -->
+  <div class="border-b border-cardBorder bg-cardBg/60 backdrop-blur">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8">
+      <button onclick="switchTab('recs')" id="tabBtn-recs" class="tab-btn py-4 border-b-2 border-binance text-binance font-medium text-sm flex items-center space-x-2">
+        <i class="ph ph-lightning text-lg"></i>
+        <span>Recomendações (Sinais)</span>
+        <span id="recsCountBadge" class="ml-1.5 px-2 py-0.2 text-[10px] bg-binance/20 text-binance rounded-full">0</span>
+      </button>
+      <button onclick="switchTab('crypto')" id="tabBtn-crypto" class="tab-btn py-4 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-sm flex items-center space-x-2">
+        <i class="ph ph-currency-btc text-lg"></i>
+        <span>Cripto Binance (5 Ativos)</span>
+      </button>
+      <button onclick="switchTab('b3')" id="tabBtn-b3" class="tab-btn py-4 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-sm flex items-center space-x-2">
+        <i class="ph ph-chart-line-up text-lg"></i>
+        <span>Ações B3 (MT5)</span>
+      </button>
+      <button onclick="switchTab('us')" id="tabBtn-us" class="tab-btn py-4 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-sm flex items-center space-x-2">
+        <i class="ph ph-buildings text-lg"></i>
+        <span>Ações US (Alpaca)</span>
+      </button>
+      <button onclick="switchTab('trades')" id="tabBtn-trades" class="tab-btn py-4 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-sm flex items-center space-x-2">
+        <i class="ph ph-receipt text-lg"></i>
+        <span>Gerenciamento de Trades</span>
+        <span id="pendingTradesBadge" class="ml-1.5 px-2 py-0.2 text-[10px] bg-emerald-500/20 text-emerald-400 rounded-full">0</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTENT CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- ==================== TAB 1: RECOMENDAÇÕES ==================== -->
+    <div id="tab-recs" class="space-y-6">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-1">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <span>Feed de Recomendações em Tempo Real</span>
+            <span class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-normal">Estratégia Quant: RSI + MACD + SMAs + ATR</span>
+          </h2>
+          <p class="text-sm text-slate-400 mt-1">Sinais com Preço de Entrada, Stop Loss e Take Profit calculados.</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Filtros de Sinais: BUY / SELL -->
+          <div class="flex items-center bg-slate-900 border border-cardBorder rounded-lg p-1 text-xs mono">
+            <button id="recActionBtn-ALL" onclick="setRecActionFilter('ALL')" class="rec-action-btn px-3 py-1.5 rounded bg-binance text-slate-950 font-bold transition flex items-center gap-1.5">
+              <span>TODOS</span>
+              <span id="badgeRecTotal" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900/30">0</span>
+            </button>
+            <button id="recActionBtn-BUY" onclick="setRecActionFilter('BUY')" class="rec-action-btn px-3 py-1.5 rounded text-slate-400 hover:text-emerald-400 font-semibold transition flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>COMPRA (BUY)</span>
+              <span id="badgeRecBuy" class="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-400">0</span>
+            </button>
+            <button id="recActionBtn-SELL" onclick="setRecActionFilter('SELL')" class="rec-action-btn px-3 py-1.5 rounded text-slate-400 hover:text-rose-400 font-semibold transition flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+              <span>VENDA (SELL)</span>
+              <span id="badgeRecSell" class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/20 text-rose-400">0</span>
+            </button>
+          </div>
+
+          <!-- Filtros de Mercado: Binance, B3, US -->
+          <div class="flex items-center bg-slate-900 border border-cardBorder rounded-lg p-1 text-xs">
+            <button id="recMarketBtn-ALL" onclick="setRecMarketFilter('ALL')" class="rec-market-btn px-3 py-1.5 rounded bg-slate-800 text-white font-medium transition">Todos Mercados</button>
+            <button id="recMarketBtn-Binance" onclick="setRecMarketFilter('Binance')" class="rec-market-btn px-3 py-1.5 rounded text-slate-400 hover:text-white font-medium transition">Cripto</button>
+            <button id="recMarketBtn-B3" onclick="setRecMarketFilter('B3')" class="rec-market-btn px-3 py-1.5 rounded text-slate-400 hover:text-white font-medium transition">B3</button>
+            <button id="recMarketBtn-US" onclick="setRecMarketFilter('US')" class="rec-market-btn px-3 py-1.5 rounded text-slate-400 hover:text-white font-medium transition">US</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recommendations Cards Grid -->
+      <div id="recommendationsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="col-span-full py-12 text-center text-slate-500">
+          <i class="ph ph-spinner-gap text-3xl animate-spin mb-2"></i>
+          <p>Calculando indicadores técnicos e sinais quantitativos...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 2: CRIPTO BINANCE ==================== -->
+    <div id="tab-crypto" class="hidden space-y-6">
+      
+      <!-- Whitelist Unlocked Banner -->
+      <div class="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex items-start justify-between">
+        <div class="flex items-start space-x-3">
+          <i class="ph-bold ph-lock-open text-2xl text-emerald-400 mt-0.5"></i>
+          <div>
+            <h3 class="font-bold text-white text-sm">Mercado Binance Spot Totalmente Liberado</h3>
+            <p class="text-xs text-slate-400 mt-0.5">A whitelist foi liberada. Você pode operar <strong class="text-white">qualquer criptomoeda</strong> listada na Binance Spot (BTC, ETH, SOL, BNB, XRP, DOGE, ADA, AVAX, LINK, AAVE, PEPE, SUI, etc.).</p>
+          </div>
+        </div>
+        <span class="text-xs px-2.5 py-1 rounded bg-slate-800 text-emerald-400 font-semibold mono">TODOS OS PARES</span>
+      </div>
+
+      <!-- Main Crypto Terminal Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Chart & Coin Selector (Left 2 cols) -->
+        <div class="lg:col-span-2 space-y-4">
+          
+          <!-- Coin Selector Pills -->
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="selectCrypto('BTCUSDT')" id="cbtn-BTCUSDT" class="crypto-btn px-3 py-1.5 rounded-lg bg-slate-800 text-white font-bold text-xs flex items-center space-x-1.5 border border-binance">
+              <span class="w-2 h-2 rounded-full bg-binance"></span>
+              <span>BTC</span>
+            </button>
+            <button onclick="selectCrypto('ETHUSDT')" id="cbtn-ETHUSDT" class="crypto-btn px-3 py-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white font-bold text-xs flex items-center space-x-1.5 border border-cardBorder">
+              <span>ETH</span>
+            </button>
+            <button onclick="selectCrypto('SOLUSDT')" id="cbtn-SOLUSDT" class="crypto-btn px-3 py-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white font-bold text-xs flex items-center space-x-1.5 border border-cardBorder">
+              <span>SOL</span>
+            </button>
+            <button onclick="selectCrypto('BNBUSDT')" id="cbtn-BNBUSDT" class="crypto-btn px-3 py-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white font-bold text-xs flex items-center space-x-1.5 border border-cardBorder">
+              <span>BNB</span>
+            </button>
+            <button onclick="selectCrypto('XRPUSDT')" id="cbtn-XRPUSDT" class="crypto-btn px-3 py-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white font-bold text-xs flex items-center space-x-1.5 border border-cardBorder">
+              <span>XRP</span>
+            </button>
+            <button onclick="selectCrypto('DOGEUSDT')" id="cbtn-DOGEUSDT" class="crypto-btn px-3 py-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white font-bold text-xs flex items-center space-x-1.5 border border-cardBorder">
+              <span>DOGE</span>
+            </button>
+            <button onclick="selectCrypto('AAVEUSDT')" id="cbtn-AAVEUSDT" class="crypto-btn px-3 py-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white font-bold text-xs flex items-center space-x-1.5 border border-cardBorder">
+              <span>AAVE</span>
+            </button>
+            <button onclick="selectCrypto('LINKUSDT')" id="cbtn-LINKUSDT" class="crypto-btn px-3 py-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white font-bold text-xs flex items-center space-x-1.5 border border-cardBorder">
+              <span>LINK</span>
+            </button>
+            
+            <!-- Custom Symbol Input -->
+            <div class="flex items-center space-x-1 ml-auto">
+              <input type="text" id="customCryptoInput" placeholder="Ex: SUI, NEAR, PEPE" class="w-32 bg-slate-900 border border-cardBorder rounded-lg px-2.5 py-1 text-white mono text-xs uppercase">
+              <button onclick="loadCustomCrypto()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-binance font-bold text-xs border border-cardBorder">
+                Carregar
+              </button>
+            </div>
+          </div>
+
+          <!-- Chart Card -->
+          <div class="bg-cardBg border border-cardBorder rounded-xl p-5 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div class="flex items-center space-x-3">
+                  <h3 id="chartSymbolTitle" class="text-xl font-bold text-white mono">BTCUSDT</h3>
+                  <span id="chartPrice" class="text-xl font-bold text-binance mono">$0.00</span>
+                  <span id="chartChange" class="text-xs px-2 py-0.5 rounded font-semibold text-emerald-400 bg-emerald-500/10">+0.00%</span>
+                </div>
+                <div id="chartOHLC" class="text-[11px] text-slate-400 mono mt-1">
+                  <span>Passe o cursor sobre os candles para ver O, H, L, C</span>
+                </div>
+              </div>
+              <div class="flex items-center space-x-2">
+                <!-- Tipo de Gráfico: Velas / Linha -->
+                <div class="flex items-center bg-slate-900 border border-cardBorder rounded-lg p-0.5 text-xs mr-2">
+                  <button id="chartTypeBtn-candles" onclick="setChartType('candles')" class="px-2.5 py-1 rounded bg-binance text-slate-950 font-bold flex items-center gap-1 transition">
+                    <span>🕯️ Velas</span>
+                  </button>
+                  <button id="chartTypeBtn-line" onclick="setChartType('line')" class="px-2.5 py-1 rounded text-slate-400 hover:text-white flex items-center gap-1 transition">
+                    <span>📈 Linha</span>
+                  </button>
+                </div>
+
+                <!-- Intervalos de Tempo -->
+                <button onclick="changeInterval('15m')" class="interval-btn text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300">15m</button>
+                <button onclick="changeInterval('1h')" class="interval-btn text-xs px-2.5 py-1 rounded bg-binance text-slate-950 font-bold">1h</button>
+                <button onclick="changeInterval('4h')" class="interval-btn text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300">4h</button>
+                <button onclick="changeInterval('1d')" class="interval-btn text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300">1D</button>
+              </div>
+            </div>
+
+            <!-- Candlestick Chart Container (Lightweight Charts) -->
+            <div id="cryptoChartContainer" class="h-96 w-full relative rounded-lg overflow-hidden bg-darkBg border border-cardBorder/60"></div>
+          </div>
+
+          <!-- Order Book Mini -->
+          <div class="bg-cardBg border border-cardBorder rounded-xl p-5">
+            <h4 class="text-sm font-bold text-white mb-3 flex items-center justify-between">
+              <span>Livro de Ofertas (Profundidade Binance)</span>
+              <span class="text-xs text-slate-400 font-normal">Top Bids & Asks</span>
+            </h4>
+            <div class="grid grid-cols-2 gap-4 text-xs mono">
+              <div>
+                <div class="text-[10px] text-slate-400 font-semibold mb-2">COMPRADORES (BIDS)</div>
+                <div id="bidsList" class="space-y-1">
+                  <div class="text-slate-500">Carregando livro...</div>
+                </div>
+              </div>
+              <div>
+                <div class="text-[10px] text-slate-400 font-semibold mb-2">VENDEDORES (ASKS)</div>
+                <div id="asksList" class="space-y-1">
+                  <div class="text-slate-500">Carregando livro...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Order Placement Form (Right col) -->
+        <div class="space-y-6">
+          <div class="bg-cardBg border border-cardBorder rounded-xl p-5 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-bold text-white text-base">Boleta Binance Cripto</h3>
+              <span class="text-xs px-2 py-0.5 rounded font-semibold bg-emerald-500/10 text-emerald-400">Binance Spot</span>
+            </div>
+
+            <!-- Side Selector (Buy / Sell) -->
+            <div class="grid grid-cols-2 gap-2 mb-4">
+              <button onclick="setOrderSide('BUY')" id="sideBtn-BUY" class="py-2.5 rounded-lg font-bold text-xs transition bg-accentGreen text-white shadow-lg shadow-emerald-500/20">COMPRAR</button>
+              <button onclick="setOrderSide('SELL')" id="sideBtn-SELL" class="py-2.5 rounded-lg font-bold text-xs transition bg-slate-800 text-slate-400 hover:text-white">VENDER</button>
+            </div>
+
+            <!-- Form Fields -->
+            <div class="space-y-3 text-xs">
+              <div>
+                <label class="block text-slate-400 mb-1">Ativo Selecionado</label>
+                <input type="text" id="orderSymbol" value="BTCUSDT" onchange="selectCrypto(this.value)" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono font-bold uppercase">
+              </div>
+
+              <div>
+                <label class="block text-slate-400 mb-1">Tipo de Ordem</label>
+                <select id="orderType" onchange="togglePriceField()" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white">
+                  <option value="MARKET">A Mercado (Market)</option>
+                  <option value="LIMIT">Limitada (Limit)</option>
+                </select>
+              </div>
+
+              <div id="priceFieldContainer" class="hidden">
+                <label class="block text-slate-400 mb-1">Preço Limite ($)</label>
+                <input type="number" id="orderPrice" placeholder="0.00" step="0.01" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono">
+              </div>
+
+              <div>
+                <div class="flex justify-between text-slate-400 mb-1">
+                  <span>Valor da Ordem ($ USDT)</span>
+                  <span id="quickBalanceHint" class="text-slate-500">Saldo Disp: $0.00</span>
+                </div>
+                <input type="number" id="orderNotional" placeholder="Ex: 15.00" value="15.00" step="1.0" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono text-sm font-bold">
+              </div>
+
+              <!-- Low-budget Quick Presets -->
+              <div>
+                <span class="text-[10px] text-slate-400">Sugestões de Valor Baixo (Live Seguro):</span>
+                <div class="grid grid-cols-4 gap-1.5 mt-1">
+                  <button type="button" onclick="setNotional(5)" class="py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 mono font-semibold">$5</button>
+                  <button type="button" onclick="setNotional(10)" class="py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 mono font-semibold">$10</button>
+                  <button type="button" onclick="setNotional(15)" class="py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 mono font-semibold active border border-binance">$15</button>
+                  <button type="button" onclick="setNotional(25)" class="py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 mono font-semibold">$25</button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <label class="block text-slate-400 mb-1">Stop Loss ($)</label>
+                  <input type="number" id="orderSL" placeholder="Opcional" step="0.01" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono">
+                </div>
+                <div>
+                  <label class="block text-slate-400 mb-1">Take Profit ($)</label>
+                  <input type="number" id="orderTP" placeholder="Opcional" step="0.01" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono">
+                </div>
+              </div>
+            </div>
+
+            <!-- Submit Button (Triggers Risk Check and Ticket) -->
+            <button onclick="submitOrderProposal()" class="w-full mt-5 py-3 rounded-xl font-bold text-sm bg-binance hover:bg-binanceHover text-slate-950 shadow-lg shadow-binance/20 transition flex items-center justify-center space-x-2">
+              <i class="ph-bold ph-shield-check text-lg"></i>
+              <span>Validar Risco e Gerar Ticket</span>
+            </button>
+            <p class="text-[11px] text-slate-500 text-center mt-2">Nenhuma ordem é enviada antes da sua confirmação explícita.</p>
+          </div>
+
+          <!-- Binance Wallet Balances Card -->
+          <div class="bg-cardBg border border-cardBorder rounded-xl p-5">
+            <h4 class="text-sm font-bold text-white mb-3 flex items-center justify-between">
+              <span>Carteira Binance</span>
+              <span id="walletModeBadge" class="text-[10px] px-2 py-0.5 rounded font-semibold bg-slate-800 text-slate-300">Carregando...</span>
+            </h4>
+            <div id="walletBalancesList" class="space-y-2 text-xs mono">
+              <div class="text-slate-500">Consultando saldos...</div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ==================== TAB 3: AÇÕES B3 (METATRADER 5) ==================== -->
+    <div id="tab-b3" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <span>Mercado de Ações Brasil (B3)</span>
+            <span id="mt5StatusBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-normal">MetaTrader 5</span>
+          </h2>
+          <p class="text-sm text-slate-400">Roteamento para sua corretora (Clear, XP, BTG, Genial) ou simulação com dados reais.</p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="text-xs px-3 py-1 rounded bg-slate-800 text-emerald-400 font-semibold mono">MOEDA: BRL (R$)</span>
+        </div>
+      </div>
+
+      <div class="bg-cardBg border border-cardBorder rounded-xl overflow-hidden shadow-xl">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900/80 border-b border-cardBorder text-slate-400 mono">
+              <tr>
+                <th class="p-4">TICKER</th>
+                <th class="p-4">ÚLTIMO PREÇO</th>
+                <th class="p-4">VARIAÇÃO 24H</th>
+                <th class="p-4">MÁXIMA / MÍNIMA</th>
+                <th class="p-4">VOLUME</th>
+                <th class="p-4 text-right">AÇÕES</th>
+              </tr>
+            </thead>
+            <tbody id="b3TableBody" class="divide-y divide-cardBorder mono">
+              <tr><td colspan="6" class="p-4 text-center text-slate-500">Carregando ações da B3...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 4: AÇÕES US (ALPACA TRADING) ==================== -->
+    <div id="tab-us" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <span>Mercado Americano (US Stocks & ETFs)</span>
+            <span id="alpacaStatusBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-normal">Alpaca REST API</span>
+          </h2>
+          <p class="text-sm text-slate-400">Negociação fracionária a partir de $1 via Alpaca (Paper/Live) com dados SEC Edgar.</p>
+        </div>
+        <span class="text-xs px-3 py-1 rounded bg-slate-800 text-binance font-semibold mono">MOEDA: USD ($)</span>
+      </div>
+
+      <div class="bg-cardBg border border-cardBorder rounded-xl overflow-hidden shadow-xl">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900/80 border-b border-cardBorder text-slate-400 mono">
+              <tr>
+                <th class="p-4">TICKER</th>
+                <th class="p-4">ÚLTIMO PREÇO</th>
+                <th class="p-4">VARIAÇÃO 24H</th>
+                <th class="p-4">MÁXIMA / MÍNIMA</th>
+                <th class="p-4">VOLUME</th>
+                <th class="p-4 text-right">AÇÕES</th>
+              </tr>
+            </thead>
+            <tbody id="usTableBody" class="divide-y divide-cardBorder mono">
+              <tr><td colspan="6" class="p-4 text-center text-slate-500">Carregando ações americanas...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 5: GERENCIAMENTO DE TRADES ==================== -->
+    <div id="tab-trades" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-white">Central de Gerenciamento & Tickets de Ordens</h2>
+          <p class="text-sm text-slate-400">Aprovação explícita ("No trade without your yes") e histórico de execuções.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Filtro por Lado (BUY / SELL) -->
+          <div class="flex items-center bg-slate-900 border border-cardBorder rounded-lg p-1 text-xs mono">
+            <button id="ticketSideBtn-ALL" onclick="setTicketSideFilter('ALL')" class="ticket-side-btn px-2.5 py-1 rounded bg-binance text-slate-950 font-bold transition">Todos Lados</button>
+            <button id="ticketSideBtn-BUY" onclick="setTicketSideFilter('BUY')" class="ticket-side-btn px-2.5 py-1 rounded text-slate-400 hover:text-emerald-400 font-semibold transition flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span>BUY</span>
+            </button>
+            <button id="ticketSideBtn-SELL" onclick="setTicketSideFilter('SELL')" class="ticket-side-btn px-2.5 py-1 rounded text-slate-400 hover:text-rose-400 font-semibold transition flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+              <span>SELL</span>
+            </button>
+          </div>
+
+          <!-- Filtro por Status -->
+          <div class="flex items-center bg-slate-900 border border-cardBorder rounded-lg p-1 text-xs">
+            <button id="ticketStatusBtn-ALL" onclick="setTicketStatusFilter('ALL')" class="ticket-status-btn px-3 py-1 rounded bg-slate-800 text-white font-medium transition">Todas</button>
+            <button id="ticketStatusBtn-READY" onclick="setTicketStatusFilter('READY')" class="ticket-status-btn px-3 py-1 rounded text-slate-400 hover:text-white font-medium transition">Aguardando</button>
+            <button id="ticketStatusBtn-EXECUTED" onclick="setTicketStatusFilter('EXECUTED')" class="ticket-status-btn px-3 py-1 rounded text-slate-400 hover:text-white font-medium transition">Executadas</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="ticketsContainer" class="space-y-4">
+        <div class="p-8 text-center text-slate-500">Carregando histórico de ordens...</div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 6: CONFIGURAÇÕES MULTI-CORRETORA & BOT ==================== -->
+    <div id="tab-settings" class="hidden max-w-4xl mx-auto space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-bold text-white">Configurações do Sistema & Modo Automático</h2>
+          <p class="text-sm text-slate-400">Gerencie a Binance (Cripto), Mercado Internacional (US), B3 (Brasil) e Robô Automático.</p>
+        </div>
+        <button onclick="saveSettings()" class="px-5 py-2 rounded-xl font-bold text-xs bg-binance hover:bg-binanceHover text-slate-950 transition shadow-lg shadow-binance/20 flex items-center gap-1.5">
+          <i class="ph-bold ph-floppy-disk text-base"></i>
+          <span>Salvar Alterações</span>
+        </button>
+      </div>
+
+      <div class="space-y-6">
+
+        <!-- ==================== SEÇÃO 1: MODO AUTOMÁTICO (ROBÔ DE TRADING COM LIMITE DE SALDO) ==================== -->
+        <div class="bg-cardBg border border-binance/40 rounded-xl p-6 space-y-5 shadow-xl relative overflow-hidden">
+          <div class="absolute -top-10 -right-10 w-32 h-32 bg-binance/5 rounded-full blur-2xl pointer-events-none"></div>
+
+          <div class="flex items-center justify-between pb-3 border-b border-cardBorder">
+            <div class="flex items-center space-x-3">
+              <div class="w-9 h-9 rounded-lg bg-binance/20 text-binance flex items-center justify-center text-xl font-bold">
+                <i class="ph-bold ph-robot"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-white text-base flex items-center gap-2">
+                  <span>Modo Automático de Operação (Auto-Trading Bot)</span>
+                </h3>
+                <p class="text-xs text-slate-400">Opera automaticamente compras qualificadas com rigoroso teto de saldo de segurança.</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-3">
+              <span id="autoTraderStatusBadge" class="text-xs px-2.5 py-1 rounded-full font-bold bg-slate-800 text-slate-400 border border-slate-700">DESATIVADO</span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="cfgAutoTradingEnabled" class="sr-only peer" onchange="toggleAutoTraderSwitch()">
+                <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-binance"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Medidor e Limite de Saldo -->
+          <div class="bg-darkBg/80 border border-cardBorder rounded-xl p-4 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
+              <div>
+                <span class="text-slate-400">Consumo da Quota de Saldo Automático:</span>
+                <span id="autoTraderSpendText" class="font-bold text-white ml-1 mono">$0.00 / $50.00 USD</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button onclick="resetAutoTradingSpend()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition" title="Zerar contador de saldo gasto">
+                  <i class="ph ph-arrow-counter-clockwise mr-1"></i>Reiniciar Quota
+                </button>
+                <button onclick="triggerAutoTradingRun()" class="px-3 py-1 rounded bg-binance/20 hover:bg-binance/30 text-binance text-[11px] font-semibold border border-binance/40 transition">
+                  <i class="ph-bold ph-play mr-1"></i>Executar Varredura Agora
+                </button>
+              </div>
+            </div>
+
+            <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+              <div id="autoTraderProgressBar" class="bg-binance h-2 transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <p class="text-[11px] text-slate-500">Ao atingir o teto de saldo definido, o robô interrompe novas compras e preserva seu capital até que a quota seja reiniciada ou aumentada.</p>
+          </div>
+
+          <!-- Parâmetros do Bot -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Saldo Máximo Permitido ($ USD)</label>
+              <input type="number" id="cfgAutoTradingMaxSpend" value="50.0" step="10" min="10" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono font-bold focus:border-binance outline-none">
+              <span class="text-[10px] text-slate-500">Teto total que o bot pode alocar</span>
+            </div>
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Valor por Ordem Automática ($ USD)</label>
+              <input type="number" id="cfgAutoTradingOrderSize" value="10.0" step="5" min="5" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono font-bold focus:border-binance outline-none">
+              <span class="text-[10px] text-slate-500">Tamanho de cada compra</span>
+            </div>
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Confiança Mínima da Estratégia (%)</label>
+              <input type="number" id="cfgAutoTradingMinConf" value="80" step="5" min="50" max="100" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono font-bold focus:border-binance outline-none">
+              <span class="text-[10px] text-slate-500">Score mínimo de indicadores (RSI/MACD)</span>
+            </div>
+          </div>
+
+          <!-- Log de Atividades do Robô -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1.5 flex items-center justify-between">
+              <span>Registro de Eventos do Robô (Logs Recentes)</span>
+              <span class="text-[10px] text-slate-500">Atualizado dinamicamente</span>
+            </label>
+            <div id="autoTraderLogsBox" class="bg-darkBg border border-cardBorder rounded-lg p-3 max-h-28 overflow-y-auto font-mono text-[11px] text-slate-300 space-y-1">
+              <div class="text-slate-500">Nenhum evento registrado ainda.</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ==================== SEÇÃO 2: BINANCE CRIPTO & WHITELIST CONFIGURÁVEL ==================== -->
+        <div class="bg-cardBg border border-cardBorder rounded-xl p-6 space-y-4 shadow-xl">
+          <div class="flex items-center justify-between pb-2 border-b border-cardBorder">
+            <h4 class="font-bold text-binance text-sm flex items-center gap-2">
+              <i class="ph-bold ph-currency-btc text-lg"></i>
+              <span>Criptomoedas Binance & Whitelist Configurável</span>
+            </h4>
+            <div class="flex items-center space-x-2">
+              <label class="text-xs text-slate-400 font-medium">Modo Live Spot</label>
+              <input type="checkbox" id="cfgBinanceLive" class="rounded bg-slate-900 border-cardBorder text-binance h-4 w-4">
+            </div>
+          </div>
+
+          <!-- Whitelist Control -->
+          <div class="bg-darkBg/60 border border-cardBorder rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <label for="cfgCryptoWhitelistEnabled" class="text-xs font-bold text-white flex items-center gap-1.5 cursor-pointer">
+                  <i class="ph-bold ph-funnel text-binance"></i>
+                  <span>Ativar Whitelist Restritiva de Criptomoedas</span>
+                </label>
+                <p class="text-[11px] text-slate-400">Se ativado, apenas as criptomoedas listadas abaixo serão permitidas para análise e ordens. Se desativado, todos os pares Spot são permitidos.</p>
+              </div>
+              <input type="checkbox" id="cfgCryptoWhitelistEnabled" class="rounded bg-slate-900 border-cardBorder text-binance h-5 w-5 cursor-pointer">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Criptomoedas Autorizadas (separadas por vírgula):</label>
+              <input type="text" id="cfgCryptoWhitelist" placeholder="Ex: BTC, ETH, AAVE, SOL, LINK, BNB, XRP" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono text-xs uppercase focus:border-binance outline-none">
+            </div>
+
+            <!-- Quick helper chips -->
+            <div class="flex flex-wrap items-center gap-1.5 pt-1">
+              <span class="text-[10px] text-slate-500 mr-1">Atalhos rápidos:</span>
+              <button onclick="addCoinToWhitelist('BTC')" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-binance mono font-semibold">+ BTC</button>
+              <button onclick="addCoinToWhitelist('ETH')" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-binance mono font-semibold">+ ETH</button>
+              <button onclick="addCoinToWhitelist('SOL')" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-binance mono font-semibold">+ SOL</button>
+              <button onclick="addCoinToWhitelist('AAVE')" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-binance mono font-semibold">+ AAVE</button>
+              <button onclick="addCoinToWhitelist('LINK')" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-binance mono font-semibold">+ LINK</button>
+              <button onclick="addCoinToWhitelist('BNB')" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-binance mono font-semibold">+ BNB</button>
+              <button onclick="addCoinToWhitelist('XRP')" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-binance mono font-semibold">+ XRP</button>
+              <button onclick="resetDefaultWhitelist()" class="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 mono font-semibold">Restaurar Padrão (5 Criptos)</button>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Binance API Key</label>
+              <input type="text" id="cfgApiKey" placeholder="Cole sua API Key da Binance" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono text-xs focus:border-binance outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Binance Secret Key</label>
+              <input type="password" id="cfgApiSecret" placeholder="Cole sua Secret Key da Binance" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono text-xs focus:border-binance outline-none">
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <input type="checkbox" id="cfgTestnet" class="rounded bg-slate-900 border-cardBorder text-binance">
+            <label for="cfgTestnet" class="text-xs text-slate-400">Usar Binance Spot Testnet (Ambiente de testes oficial)</label>
+          </div>
+        </div>
+
+        <!-- ==================== SEÇÃO 3: MERCADO INTERNACIONAL (US STOCKS - ALPACA) ==================== -->
+        <div class="bg-cardBg border border-cardBorder rounded-xl p-6 space-y-4 shadow-xl">
+          <div class="flex items-center justify-between pb-2 border-b border-cardBorder">
+            <h4 class="font-bold text-yellow-400 text-sm flex items-center gap-2">
+              <i class="ph-bold ph-buildings text-lg"></i>
+              <span>Mercado Internacional Americano (US Stocks & ETFs)</span>
+            </h4>
+            <div class="flex items-center space-x-3">
+              <div class="flex items-center space-x-1.5">
+                <input type="checkbox" id="cfgUsMarketEnabled" checked class="rounded bg-slate-900 border-cardBorder text-yellow-400 h-4 w-4">
+                <label for="cfgUsMarketEnabled" class="text-xs font-semibold text-white">Habilitar Mercado US</label>
+              </div>
+              <div class="flex items-center space-x-1.5">
+                <input type="checkbox" id="cfgAlpacaPaper" checked class="rounded bg-slate-900 border-cardBorder text-yellow-400 h-4 w-4">
+                <label for="cfgAlpacaPaper" class="text-xs text-slate-400">Paper Trading</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Orçamento Alocado para US ($ USD)</label>
+              <input type="number" id="cfgUsBudget" value="100.0" step="10" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono font-bold focus:border-yellow-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Ordem Máxima por Trade US ($ USD)</label>
+              <input type="number" id="cfgUsMaxOrder" value="25.0" step="5" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono font-bold focus:border-yellow-400 outline-none">
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Alpaca API Key ID</label>
+              <input type="text" id="cfgAlpacaKey" placeholder="Ex: PK..." class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono text-xs focus:border-yellow-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Alpaca Secret Key</label>
+              <input type="password" id="cfgAlpacaSecret" placeholder="Sua Secret Key da Alpaca" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono text-xs focus:border-yellow-400 outline-none">
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500">Permite compra e venda de ações (AAPL, NVDA, TSLA, etc.) fracionárias a partir de $1 USD via Alpaca API.</p>
+        </div>
+
+        <!-- ==================== SEÇÃO 4: BOLSA BRASILEIRA (B3 - METATRADER 5) ==================== -->
+        <div class="bg-cardBg border border-cardBorder rounded-xl p-6 space-y-4 shadow-xl">
+          <div class="flex items-center justify-between pb-2 border-b border-cardBorder">
+            <h4 class="font-bold text-emerald-400 text-sm flex items-center gap-2">
+              <i class="ph-bold ph-chart-line-up text-lg"></i>
+              <span>Bolsa Brasileira (B3 - MetaTrader 5)</span>
+            </h4>
+            <div class="flex items-center space-x-3">
+              <div class="flex items-center space-x-1.5">
+                <input type="checkbox" id="cfgB3MarketEnabled" checked class="rounded bg-slate-900 border-cardBorder text-emerald-400 h-4 w-4">
+                <label for="cfgB3MarketEnabled" class="text-xs font-semibold text-white">Habilitar Mercado B3</label>
+              </div>
+              <div class="flex items-center space-x-1.5">
+                <input type="checkbox" id="cfgMt5Enabled" checked class="rounded bg-slate-900 border-cardBorder text-emerald-400 h-4 w-4">
+                <label for="cfgMt5Enabled" class="text-xs text-slate-400">Conexão MT5 Local</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Orçamento Alocado para B3 (R$ BRL)</label>
+              <input type="number" id="cfgB3Budget" value="1000.0" step="100" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono font-bold focus:border-emerald-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Ordem Máxima por Trade B3 (R$ BRL)</label>
+              <input type="number" id="cfgB3MaxOrder" value="250.0" step="50" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono font-bold focus:border-emerald-400 outline-none">
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <input type="checkbox" id="cfgB3AllowFractional" checked class="rounded bg-slate-900 border-cardBorder text-emerald-400 h-4 w-4">
+            <label for="cfgB3AllowFractional" class="text-xs text-slate-300">Permitir Lote Fracionário Automático (sufixo 'F', ex: PETR4F para 1 a 99 ações)</label>
+          </div>
+
+          <p class="text-xs text-slate-400">Integração nativa no Windows com terminais de corretoras brasileiras (XP, Clear, BTG, Genial). Se o MT5 não estiver aberto, roda em simulação segura com cotações reais.</p>
+        </div>
+
+        <!-- ==================== SEÇÃO 5: PARÂMETROS GLOBAIS DE RISCO ==================== -->
+        <div class="bg-cardBg border border-cardBorder rounded-xl p-6 space-y-4 shadow-xl">
+          <h4 class="font-bold text-white text-sm flex items-center gap-2 pb-2 border-b border-cardBorder">
+            <i class="ph-bold ph-shield text-lg text-rose-400"></i>
+            <span>Parâmetros Globais de Risco & Segurança</span>
+          </h4>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label class="block text-slate-400 mb-1">Orçamento Global Base ($ USD)</label>
+              <input type="number" id="cfgBudget" value="100.0" step="10" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono font-bold focus:border-slate-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Ordem Máxima Global Padrão ($ USD)</label>
+              <input type="number" id="cfgMaxOrder" value="25.0" step="5" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono font-bold focus:border-slate-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Reserva de Caixa Obrigatória (%)</label>
+              <input type="number" id="cfgCashBuffer" value="15" step="5" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono focus:border-slate-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Limite Máximo por Posição (%)</label>
+              <input type="number" id="cfgMaxPosition" value="30" step="5" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono focus:border-slate-400 outline-none">
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-end">
+          <button onclick="saveSettings()" class="px-8 py-3 rounded-xl font-bold text-sm bg-binance hover:bg-binanceHover text-slate-950 transition shadow-xl shadow-binance/20 flex items-center gap-2">
+            <i class="ph-bold ph-check text-lg"></i>
+            <span>Salvar Todas as Configurações</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ==================== MODAL DE GRÁFICO INTERATIVO DE CANDLES ==================== -->
+  <div id="chartModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+    <div class="bg-cardBg border border-cardBorder rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-4">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-cardBorder">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-lg bg-binance/20 text-binance flex items-center justify-center text-xl font-bold">
+            <i class="ph-bold ph-chart-line-up"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 id="modalChartSymbol" class="font-bold text-white text-lg mono">BTCUSDT</h3>
+              <span id="modalChartMarketBadge" class="text-xs px-2 py-0.5 rounded bg-slate-800 text-binance font-semibold border border-cardBorder">BINANCE</span>
+              <span id="modalChartPrice" class="font-bold text-emerald-400 mono text-base">$0.00</span>
+            </div>
+            <div id="modalChartOHLC" class="text-[11px] text-slate-400 mono mt-0.5">
+              <span>Passe o cursor sobre os candles para visualizar detalhes</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+          <!-- Toggle Tipo de Gráfico: Velas / Linha -->
+          <div class="flex items-center bg-slate-900 border border-cardBorder rounded-lg p-0.5 text-xs">
+            <button id="modalChartTypeBtn-candles" onclick="setModalChartType('candles')" class="px-2.5 py-1 rounded bg-binance text-slate-950 font-bold transition">
+              <span>🕯️ Velas</span>
+            </button>
+            <button id="modalChartTypeBtn-line" onclick="setModalChartType('line')" class="px-2.5 py-1 rounded text-slate-400 hover:text-white transition">
+              <span>📈 Linha</span>
+            </button>
+          </div>
+
+          <!-- Timeframes -->
+          <div class="flex items-center space-x-1">
+            <button onclick="changeModalInterval('15m')" class="modal-interval-btn text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300">15m</button>
+            <button onclick="changeModalInterval('1h')" class="modal-interval-btn text-xs px-2.5 py-1 rounded bg-binance text-slate-950 font-bold">1h</button>
+            <button onclick="changeModalInterval('4h')" class="modal-interval-btn text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300">4h</button>
+            <button onclick="changeModalInterval('1d')" class="modal-interval-btn text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300">1D</button>
+          </div>
+
+          <button onclick="closeChartModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+            <i class="ph ph-x text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Chart Canvas/Container -->
+      <div id="modalChartContainer" class="h-96 w-full relative rounded-xl overflow-hidden bg-darkBg border border-cardBorder/60"></div>
+
+      <!-- Modal Footer -->
+      <div class="pt-3 border-t border-cardBorder flex items-center justify-between">
+        <div class="text-xs text-slate-400 flex items-center gap-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-accentGreen"></span>
+          <span>Velas Verdes: Alta • Velas Vermelhas: Baixa • Linha Pontilhada: Média Móvel (SMA 20)</span>
+        </div>
+        <div class="flex items-center space-x-3">
+          <button onclick="closeChartModal()" class="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold">Fechar</button>
+          <button id="modalChartTradeBtn" class="px-5 py-2 rounded-lg bg-accentGreen hover:bg-emerald-600 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
+            <i class="ph-bold ph-receipt text-sm"></i>
+            <span>Operar Este Ativo</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CONFIRMATION & APPROVAL MODAL -->
+  <div id="approvalModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div class="bg-cardBg border border-cardBorder rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-cardBorder">
+        <h3 class="font-bold text-white text-base flex items-center gap-2">
+          <i class="ph-bold ph-receipt text-binance text-xl"></i>
+          <span>Revisão e Confirmação de Ordem</span>
+        </h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white"><i class="ph ph-x text-xl"></i></button>
+      </div>
+
+      <div id="modalTicketContent" class="text-xs space-y-3 mono">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="pt-3 border-t border-cardBorder flex items-center justify-end space-x-3">
+        <button onclick="closeModal()" class="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold">Cancelar</button>
+        <button id="modalApproveBtn" class="px-5 py-2 rounded-lg bg-accentGreen hover:bg-emerald-600 text-white text-xs font-bold shadow-lg shadow-emerald-500/20">Aprovar e Executar (Yes)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 px-4 py-3 rounded-xl bg-slate-800 border border-cardBorder text-white text-xs font-semibold shadow-2xl flex items-center space-x-2">
+    <i id="toastIcon" class="ph-bold ph-info text-binance text-base"></i>
+    <span id="toastMsg">Mensagem</span>
+  </div>
+
+  <!-- APPLICATION SCRIPTS -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
