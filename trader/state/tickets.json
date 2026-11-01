@@ -1,6 +1,39 @@
 {
   "tickets": [
     {
+      "id": "TICK-1793576386713",
+      "created_at": "2026-11-01T19:39:46.714503",
+      "symbol": "DOGEUSDT",
+      "side": "BUY",
+      "market": "Binance",
+      "order_type": "MARKET",
+      "notional": 15.0,
+      "qty": null,
+      "price": null,
+      "stop_loss": null,
+      "take_profit": null,
+      "status": "EXECUTED",
+      "verdict": "PASS",
+      "reasons": [],
+      "warnings": [],
+      "rationale": "Teste com whitelist liberada",
+      "approved_at": "2026-11-01T19:39:46.743029",
+      "executed_at": "2026-11-01T19:39:47.530520",
+      "execution_result": {
+        "order_id": 1793576387530,
+        "client_order_id": "paper_1793576387530",
+        "symbol": "DOGEUSDT",
+        "side": "BUY",
+        "type": "MARKET",
+        "status": "FILLED",
+        "executed_qty": 199.0,
+        "cumulative_quote_qty": 15.0,
+        "price": 0.07554,
+        "mode": "paper_trading",
+        "time": 1793576387530
+      }
+    },
+    {
       "id": "TICK-1793575359755",
       "created_at": "2026-11-01T19:22:39.755954",
       "symbol": "AAPL",

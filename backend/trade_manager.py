@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from trader_binance.connector import BinanceConnector, POPULAR_CRYPTO_ASSETS, POPULAR_CRYPTO_SYMBOLS
 from trader_us.alpaca_connector import AlpacaConnector
 from trader_b3.mt5_connector import B3MT5Connector
+from trader_b3.cloud_api_connector import B3CloudAPIConnector
 import check as risk_check
 import ticket as broker_ticket
 
@@ -48,6 +49,14 @@ DEFAULT_CONFIG = {
     "alpaca_api_secret": "",
     "alpaca_paper": True,
     "b3_market_enabled": True,
+    "b3_connection_type": "cloud_api",
+    "b3_provider": "btg_pactual",
+    "b3_api_key": "",
+    "b3_api_secret": "",
+    "b3_account": "",
+    "b3_api_token": "",
+    "b3_cloud_live": False,
+    "b3_cloud_endpoint": "",
     "b3_max_order_brl": 250.0,
     "b3_budget_brl": 1000.0,
     "b3_allow_fractional": True,
@@ -118,8 +127,27 @@ class TradeManager:
             paper=bool(cfg.get("alpaca_paper", True))
         )
 
-    def get_mt5_connector(self) -> B3MT5Connector:
-        return B3MT5Connector()
+    def get_b3_connector(self):
+        """Returns the active B3 connector.
+        Defaults to Cloud REST API (BTG Pactual, Genial, Cedro, XP) without needing PC/MetaTrader.
+        """
+        cfg = self.load_config()
+        conn_type = cfg.get("b3_connection_type", "cloud_api")
+        if conn_type == "mt5_desktop":
+            return B3MT5Connector()
+        return B3CloudAPIConnector(
+            provider=cfg.get("b3_provider", "btg_pactual"),
+            api_key=cfg.get("b3_api_key", "").strip(),
+            api_secret=cfg.get("b3_api_secret", "").strip(),
+            account=cfg.get("b3_account", "").strip(),
+            token=cfg.get("b3_api_token", "").strip(),
+            environment="live" if cfg.get("b3_cloud_live", False) else "sandbox",
+            endpoint=cfg.get("b3_cloud_endpoint", "").strip()
+        )
+
+    def get_mt5_connector(self):
+        """Backwards compatibility: routes to active B3 connector."""
+        return self.get_b3_connector()
 
     def load_tickets(self) -> List[Dict]:
         try:
@@ -311,10 +339,10 @@ class TradeManager:
                 take_profit=tp
             )
         elif market == "B3" or any(symbol.endswith(x) for x in ["3", "4", "5", "6", "11", ".SA"]):
-            # 3. MetaTrader 5 B3 Execution
-            mt5_conn = self.get_mt5_connector()
+            # 3. B3 Execution (Cloud Direct API - BTG/Genial/Cedro/XP sem MT5)
+            b3_conn = self.get_b3_connector()
             order_qty = int(qty) if qty else (100 if notional and notional > 500 else 10)
-            execution_result = mt5_conn.create_order(
+            execution_result = b3_conn.create_order(
                 symbol=symbol,
                 side=side,
                 qty=order_qty,

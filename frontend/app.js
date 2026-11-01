@@ -757,12 +757,19 @@ async function loadPortfolio() {
     const isLive = b.mode === 'live';
     modeBadge.innerText = isLive ? 'SPOT LIVE' : 'SIMULAÇÃO / PAPER';
 
-    // Update MT5 and Alpaca badges
-    const mt5Badge = document.getElementById('mt5StatusBadge');
-    if (mt5Badge && data.b3_mt5) {
-      const isMt5Live = data.b3_mt5.connected;
-      mt5Badge.innerText = isMt5Live ? 'MT5 CONECTADO' : 'MT5 SIMULAÇÃO ATIVA';
-      mt5Badge.className = `text-xs px-2.5 py-0.5 rounded-full ${isMt5Live ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'}`;
+    // Update B3 (Cloud API / MT5) and Alpaca badges
+    const b3Badge = document.getElementById('mt5StatusBadge');
+    const b3Data = data.b3 || data.b3_mt5;
+    if (b3Badge && b3Data) {
+      if (b3Data.no_pc_needed || b3Data.connection_type === 'Cloud Direct REST API') {
+        const isLive = b3Data.mode === 'b3_cloud_live';
+        b3Badge.innerHTML = `<i class="ph-bold ph-cloud text-sm"></i><span>${isLive ? 'B3 CLOUD LIVE (REAL)' : 'B3 CLOUD API (ONLINE 24/7)'}</span>`;
+        b3Badge.className = `text-xs px-2.5 py-0.5 rounded-full ${isLive ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-400 font-bold' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold'} flex items-center gap-1.5`;
+      } else {
+        const isMt5Live = b3Data.connected;
+        b3Badge.innerText = isMt5Live ? 'MT5 CONECTADO' : 'MT5 SIMULAÇÃO ATIVA';
+        b3Badge.className = `text-xs px-2.5 py-0.5 rounded-full ${isMt5Live ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'}`;
+      }
     }
 
     const alpacaBadge = document.getElementById('alpacaStatusBadge');
@@ -1485,9 +1492,24 @@ async function loadConfigForm() {
       document.getElementById('cfgAlpacaPaper').checked = cfg.alpaca_paper !== false;
     }
 
-    // 4. B3 Market (MT5)
+    // 4. B3 Market (Cloud API & MT5)
     const b3Enabled = document.getElementById('cfgB3MarketEnabled');
     if (b3Enabled) b3Enabled.checked = cfg.b3_market_enabled !== false;
+    const b3ConnType = document.getElementById('cfgB3ConnType');
+    if (b3ConnType) b3ConnType.value = cfg.b3_connection_type || 'cloud_api';
+    const b3Provider = document.getElementById('cfgB3Provider');
+    if (b3Provider) b3Provider.value = cfg.b3_provider || 'btg_pactual';
+    const b3Account = document.getElementById('cfgB3Account');
+    if (b3Account) b3Account.value = cfg.b3_account || '';
+    const b3ApiKey = document.getElementById('cfgB3ApiKey');
+    if (b3ApiKey) b3ApiKey.value = cfg.b3_api_key || '';
+    const b3ApiSecret = document.getElementById('cfgB3ApiSecret');
+    if (b3ApiSecret) b3ApiSecret.value = cfg.b3_api_secret || '';
+    const b3Token = document.getElementById('cfgB3Token');
+    if (b3Token) b3Token.value = cfg.b3_api_token || '';
+    const b3CloudLive = document.getElementById('cfgB3CloudLive');
+    if (b3CloudLive) b3CloudLive.checked = cfg.b3_cloud_live === true;
+
     const b3Budget = document.getElementById('cfgB3Budget');
     if (b3Budget) b3Budget.value = cfg.b3_budget_brl ?? 1000.0;
     const b3MaxOrder = document.getElementById('cfgB3MaxOrder');
@@ -1498,6 +1520,7 @@ async function loadConfigForm() {
     if (document.getElementById('cfgMt5Enabled')) {
       document.getElementById('cfgMt5Enabled').checked = cfg.mt5_enabled !== false;
     }
+    toggleB3ConnTypeUI();
 
     // 5. Global Risk
     document.getElementById('cfgBudget').value = cfg.budget || 100.0;
@@ -1535,12 +1558,19 @@ async function saveSettings() {
     alpaca_api_secret: document.getElementById('cfgAlpacaSecret') ? document.getElementById('cfgAlpacaSecret').value.trim() : '',
     alpaca_paper: document.getElementById('cfgAlpacaPaper') ? document.getElementById('cfgAlpacaPaper').checked : true,
 
-    // B3 Market
+    // B3 Market (Cloud API & MT5)
     b3_market_enabled: document.getElementById('cfgB3MarketEnabled')?.checked !== false,
+    b3_connection_type: document.getElementById('cfgB3ConnType')?.value || 'cloud_api',
+    b3_provider: document.getElementById('cfgB3Provider')?.value || 'btg_pactual',
+    b3_account: document.getElementById('cfgB3Account')?.value.trim() || '',
+    b3_api_key: document.getElementById('cfgB3ApiKey')?.value.trim() || '',
+    b3_api_secret: document.getElementById('cfgB3ApiSecret')?.value.trim() || '',
+    b3_api_token: document.getElementById('cfgB3Token')?.value.trim() || '',
+    b3_cloud_live: document.getElementById('cfgB3CloudLive')?.checked || false,
     b3_budget_brl: parseFloat(document.getElementById('cfgB3Budget')?.value) || 1000.0,
     b3_max_order_brl: parseFloat(document.getElementById('cfgB3MaxOrder')?.value) || 250.0,
     b3_allow_fractional: document.getElementById('cfgB3AllowFractional')?.checked !== false,
-    mt5_enabled: document.getElementById('cfgMt5Enabled') ? document.getElementById('cfgMt5Enabled').checked : true,
+    mt5_enabled: document.getElementById('cfgMt5Enabled') ? document.getElementById('cfgMt5Enabled').checked : false,
 
     // Auto-Trading Bot
     auto_trading_enabled: document.getElementById('cfgAutoTradingEnabled')?.checked || false,
@@ -2057,4 +2087,20 @@ function mountBento(root, data) {
   return () => {
     alive = false; frames.forEach(f => cancelAnimationFrame(f)); ro.disconnect(); clearTimeout(rz);
   };
+}
+
+// Toggle B3 Connection Type in Settings UI
+function toggleB3ConnTypeUI() {
+  const connType = document.getElementById('cfgB3ConnType')?.value || 'cloud_api';
+  const cloudDiv = document.getElementById('b3CloudApiFields');
+  const mt5Div = document.getElementById('b3Mt5DesktopFields');
+  if (cloudDiv && mt5Div) {
+    if (connType === 'cloud_api') {
+      cloudDiv.classList.remove('hidden');
+      mt5Div.classList.add('hidden');
+    } else {
+      cloudDiv.classList.add('hidden');
+      mt5Div.classList.remove('hidden');
+    }
+  }
 }

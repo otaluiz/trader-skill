@@ -100,6 +100,14 @@ class ConfigUpdateRequest(BaseModel):
     alpaca_api_secret: Optional[str] = None
     alpaca_paper: Optional[bool] = None
     b3_market_enabled: Optional[bool] = None
+    b3_connection_type: Optional[str] = None
+    b3_provider: Optional[str] = None
+    b3_api_key: Optional[str] = None
+    b3_api_secret: Optional[str] = None
+    b3_account: Optional[str] = None
+    b3_api_token: Optional[str] = None
+    b3_cloud_live: Optional[bool] = None
+    b3_cloud_endpoint: Optional[str] = None
     b3_max_order_brl: Optional[float] = None
     b3_budget_brl: Optional[float] = None
     b3_allow_fractional: Optional[bool] = None
@@ -116,7 +124,8 @@ def health_check():
     cfg = trade_mgr.load_config()
     b_conn = trade_mgr.get_binance_connector()
     alpaca = trade_mgr.get_alpaca_connector()
-    mt5_conn = trade_mgr.get_mt5_connector()
+    b3_conn = trade_mgr.get_b3_connector()
+    b3_status = b3_conn.get_status()
 
     return {
         "status": "online",
@@ -134,13 +143,21 @@ def health_check():
             "has_keys": alpaca.has_credentials(),
             "paper": bool(cfg.get("alpaca_paper", True))
         },
+        "b3": {
+            "enabled": cfg.get("b3_market_enabled", True),
+            "connection_type": cfg.get("b3_connection_type", "cloud_api"),
+            "no_pc_needed": cfg.get("b3_connection_type", "cloud_api") == "cloud_api",
+            "provider": cfg.get("b3_provider", "btg_pactual"),
+            "connected": b3_conn.is_connected(),
+            "status": b3_status.get("broker")
+        },
         "b3_mt5": {
             "enabled": cfg.get("b3_market_enabled", True),
-            "connected": mt5_conn.is_connected(),
-            "status": mt5_conn.get_status().get("broker")
+            "connected": b3_conn.is_connected(),
+            "status": b3_status.get("broker")
         },
         "auto_trading": auto_trader.get_status(),
-        "supported_markets": ["Binance (Crypto)", "Alpaca (US Stocks)", "MetaTrader 5 (B3 Brasil)"]
+        "supported_markets": ["Binance (Crypto)", "Alpaca (US Stocks)", "B3 Cloud API (Brasil 24/7)"]
     }
 
 
@@ -313,7 +330,8 @@ def get_portfolio():
     cfg = trade_mgr.load_config()
     b_conn = trade_mgr.get_binance_connector()
     alpaca = trade_mgr.get_alpaca_connector()
-    mt5_conn = trade_mgr.get_mt5_connector()
+    b3_conn = trade_mgr.get_b3_connector()
+    b3_status = b3_conn.get_status()
 
     # Binance balances
     binance_account = b_conn.get_account_balances()
@@ -333,9 +351,6 @@ def get_portfolio():
     # Alpaca US status
     alpaca_account = alpaca.get_account()
 
-    # MT5 B3 status
-    mt5_status = mt5_conn.get_status()
-
     # Portfolio state
     tickets = trade_mgr.load_tickets()
     executed = [t for t in tickets if t.get("status") == "EXECUTED"]
@@ -349,10 +364,18 @@ def get_portfolio():
             "total_estimated_usd": round(total_crypto_usd, 2)
         },
         "alpaca": alpaca_account,
-        "b3_mt5": mt5_status,
+        "b3": b3_status,
+        "b3_mt5": b3_status,
         "executed_trades_count": len(executed),
         "recent_executions": executed[:10]
     }
+
+
+@app.get("/api/market/b3/positions")
+def get_b3_positions():
+    """Returns active custody/positions in B3."""
+    b3_conn = trade_mgr.get_b3_connector()
+    return b3_conn.get_positions()
 
 
 @app.get("/api/config")

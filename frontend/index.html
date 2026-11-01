@@ -227,7 +227,7 @@
       </button>
       <button onclick="switchTab('b3')" id="tabBtn-b3" class="tab-btn py-4 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-sm flex items-center space-x-2 whitespace-nowrap">
         <i class="ph ph-chart-line-up text-lg"></i>
-        <span>Ações B3 (MT5)</span>
+        <span>Ações B3 (Brasil)</span>
       </button>
       <button onclick="switchTab('us')" id="tabBtn-us" class="tab-btn py-4 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-sm flex items-center space-x-2 whitespace-nowrap">
         <i class="ph ph-buildings text-lg"></i>
@@ -523,15 +523,18 @@
 
     </div>
 
-    <!-- ==================== TAB 3: AÇÕES B3 (METATRADER 5) ==================== -->
+    <!-- ==================== TAB 3: AÇÕES B3 (BRASIL) ==================== -->
     <div id="tab-b3" class="hidden space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 class="text-xl font-bold text-white flex items-center gap-2">
             <span>Mercado de Ações Brasil (B3)</span>
-            <span id="mt5StatusBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-normal">MetaTrader 5</span>
+            <span id="mt5StatusBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold flex items-center gap-1.5">
+              <i class="ph-bold ph-cloud text-sm"></i>
+              <span>B3 Cloud API (24/7 Sem PC)</span>
+            </span>
           </h2>
-          <p class="text-sm text-slate-400">Roteamento para sua corretora (Clear, XP, BTG, Genial) ou simulação com dados reais.</p>
+          <p class="text-sm text-slate-400">Conexão via API direta em nuvem (BTG Pactual, Genial, Cedro, XP) sem necessidade de MetaTrader ou computador ligado.</p>
         </div>
         <div class="flex items-center space-x-2">
           <span class="text-xs px-3 py-1 rounded bg-slate-800 text-emerald-400 font-semibold mono">MOEDA: BRL (R$)</span>
@@ -828,25 +831,95 @@
           <p class="text-[11px] text-slate-500">Permite compra e venda de ações (AAPL, NVDA, TSLA, etc.) fracionárias a partir de $1 USD via Alpaca API.</p>
         </div>
 
-        <!-- ==================== SEÇÃO 4: BOLSA BRASILEIRA (B3 - METATRADER 5) ==================== -->
-        <div class="bg-cardBg border border-cardBorder rounded-xl p-6 space-y-4 shadow-xl">
-          <div class="flex items-center justify-between pb-2 border-b border-cardBorder">
-            <h4 class="font-bold text-emerald-400 text-sm flex items-center gap-2">
-              <i class="ph-bold ph-chart-line-up text-lg"></i>
-              <span>Bolsa Brasileira (B3 - MetaTrader 5)</span>
-            </h4>
+        <!-- ==================== SEÇÃO 4: BOLSA BRASILEIRA (B3 - API DIRETA EM NUVEM / SEM PC) ==================== -->
+        <div class="bg-cardBg border border-cardBorder rounded-xl p-6 space-y-5 shadow-xl">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-cardBorder gap-2">
+            <div>
+              <h4 class="font-bold text-emerald-400 text-sm flex items-center gap-2">
+                <i class="ph-bold ph-cloud text-lg"></i>
+                <span>Bolsa Brasileira B3 (Conexão Direta via API em Nuvem)</span>
+              </h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">Opere ações da B3 24/7 diretamente pela API da sua corretora sem precisar manter o PC ligado e sem MetaTrader.</p>
+            </div>
             <div class="flex items-center space-x-3">
               <div class="flex items-center space-x-1.5">
                 <input type="checkbox" id="cfgB3MarketEnabled" checked class="rounded bg-slate-900 border-cardBorder text-emerald-400 h-4 w-4">
-                <label for="cfgB3MarketEnabled" class="text-xs font-semibold text-white">Habilitar Mercado B3</label>
-              </div>
-              <div class="flex items-center space-x-1.5">
-                <input type="checkbox" id="cfgMt5Enabled" checked class="rounded bg-slate-900 border-cardBorder text-emerald-400 h-4 w-4">
-                <label for="cfgMt5Enabled" class="text-xs text-slate-400">Conexão MT5 Local</label>
+                <label for="cfgB3MarketEnabled" class="text-xs font-semibold text-white">Habilitar B3</label>
               </div>
             </div>
           </div>
 
+          <!-- Tipo de Conexão -->
+          <div class="bg-slate-900/60 border border-cardBorder rounded-lg p-3.5 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <i class="ph-bold ph-plugs-connected text-emerald-400"></i>
+                <span>Método de Conexão com a B3:</span>
+              </label>
+              <select id="cfgB3ConnType" onchange="toggleB3ConnTypeUI()" class="bg-slate-800 border border-cardBorder text-white text-xs rounded-lg px-3 py-1.5 font-semibold focus:border-emerald-400 outline-none">
+                <option value="cloud_api" selected>☁️ API Direta em Nuvem (Sem PC Ligado / Sem MetaTrader)</option>
+                <option value="mt5_desktop">🖥️ MetaTrader 5 Local (Legado - Requer PC Aberto)</option>
+              </select>
+            </div>
+
+            <!-- Provedores Cloud API -->
+            <div id="b3CloudApiFields" class="space-y-3 pt-2 border-t border-cardBorder/60">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">Corretora / Provedor Cloud API</label>
+                  <select id="cfgB3Provider" class="w-full bg-slate-900 border border-cardBorder text-white rounded-lg px-3 py-2 font-medium focus:border-emerald-400 outline-none">
+                    <option value="btg_pactual">BTG Pactual (Trader API / DMA Nuvem)</option>
+                    <option value="genial">Genial Investimentos (API Trader REST)</option>
+                    <option value="cedro">Cedro Technologies (Anywhere B3 Cloud API)</option>
+                    <option value="xp">XP Investimentos (Developer DMA2 API)</option>
+                    <option value="open_dma">Open DMA Cloud Gateway (Custom Endpoint)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">Número da Conta B3 na Corretora</label>
+                  <input type="text" id="cfgB3Account" placeholder="Ex: 123456-7" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono focus:border-emerald-400 outline-none">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">API Key / Client ID</label>
+                  <input type="text" id="cfgB3ApiKey" placeholder="Sua Chave de API da Corretora" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono focus:border-emerald-400 outline-none">
+                </div>
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">API Secret / Client Secret</label>
+                  <input type="password" id="cfgB3ApiSecret" placeholder="Seu Segredo de API" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono focus:border-emerald-400 outline-none">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">Token de Acesso / Bearer Token (Opcional)</label>
+                  <input type="password" id="cfgB3Token" placeholder="OAuth2 Bearer Token se aplicável" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono focus:border-emerald-400 outline-none">
+                </div>
+                <div class="flex items-center space-x-2 pt-6">
+                  <input type="checkbox" id="cfgB3CloudLive" class="rounded bg-slate-900 border-cardBorder text-emerald-400 h-4 w-4">
+                  <label for="cfgB3CloudLive" class="text-xs text-emerald-400 font-bold">Ativar Modo Live B3 (Produção com Saldo Real)</label>
+                </div>
+              </div>
+
+              <div class="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 flex items-center gap-2">
+                <i class="ph-bold ph-shield-check text-base text-emerald-400"></i>
+                <span><strong>Operação 100% em Nuvem:</strong> As ordens são enviadas por requisições REST/HTTPS autenticadas diretamente aos servidores da corretora. Seu bot funciona 24 horas por dia em qualquer servidor ou VPS sem exigir MetaTrader ou máquina local.</span>
+              </div>
+            </div>
+
+            <!-- Opção Legada MT5 -->
+            <div id="b3Mt5DesktopFields" class="hidden space-y-2 pt-2 border-t border-cardBorder/60 text-xs">
+              <div class="flex items-center space-x-2">
+                <input type="checkbox" id="cfgMt5Enabled" class="rounded bg-slate-900 border-cardBorder text-emerald-400 h-4 w-4">
+                <label for="cfgMt5Enabled" class="text-xs font-semibold text-slate-300">Habilitar Ponte IPC do MetaTrader 5 Local</label>
+              </div>
+              <p class="text-[11px] text-slate-500">Exige terminal MT5 instalado e em execução no Windows local.</p>
+            </div>
+          </div>
+
+          <!-- Limites e Fracionário -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <label class="block text-slate-400 font-semibold mb-1">Orçamento Alocado para B3 (R$ BRL)</label>
@@ -862,8 +935,6 @@
             <input type="checkbox" id="cfgB3AllowFractional" checked class="rounded bg-slate-900 border-cardBorder text-emerald-400 h-4 w-4">
             <label for="cfgB3AllowFractional" class="text-xs text-slate-300">Permitir Lote Fracionário Automático (sufixo 'F', ex: PETR4F para 1 a 99 ações)</label>
           </div>
-
-          <p class="text-xs text-slate-400">Integração nativa no Windows com terminais de corretoras brasileiras (XP, Clear, BTG, Genial). Se o MT5 não estiver aberto, roda em simulação segura com cotações reais.</p>
         </div>
 
         <!-- ==================== SEÇÃO 5: PARÂMETROS GLOBAIS DE RISCO ==================== -->

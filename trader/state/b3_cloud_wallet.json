@@ -1,0 +1,67 @@
+{
+  "cash_brl": 9620.0,
+  "positions": {
+    "PETR4": {
+      "shares": 110,
+      "avg_price": 38.5
+    },
+    "VALE3": {
+      "shares": 50,
+      "avg_price": 62.1
+    },
+    "ITUB4": {
+      "shares": 100,
+      "avg_price": 34.2
+    }
+  },
+  "orders": [
+    {
+      "order_id": "B3-CLOUD-1793576341576",
+      "timestamp": 1793576341.576134,
+      "symbol": "PETR4",
+      "side": "BUY",
+      "quantity": 10,
+      "price": 38.5,
+      "notional_brl": 385.0,
+      "status": "FILLED",
+      "mode": "b3_cloud_simulation",
+      "provider": "BTG Pactual Trader API"
+    },
+    {
+      "order_id": "B3-CLOUD-1793576341591",
+      "timestamp": 1793576341.5911748,
+      "symbol": "PETR4",
+      "side": "SELL",
+      "quantity": 5,
+      "price": 39.0,
+      "notional_brl": 195.0,
+      "status": "FILLED",
+      "mode": "b3_cloud_simulation",
+      "provider": "BTG Pactual Trader API"
+    },
+    {
+      "order_id": "B3-CLOUD-1793576356614",
+      "timestamp": 1793576356.6142957,
+      "symbol": "PETR4",
+      "side": "BUY",
+      "quantity": 10,
+      "price": 38.5,
+      "notional_brl": 385.0,
+      "status": "FILLED",
+      "mode": "b3_cloud_simulation",
+      "provider": "BTG Pactual Trader API"
+    },
+    {
+      "order_id": "B3-CLOUD-1793576356630",
+      "timestamp": 1793576356.6301866,
+      "symbol": "PETR4",
+      "side": "SELL",
+      "quantity": 5,
+      "price": 39.0,
+      "notional_brl": 195.0,
+      "status": "FILLED",
+      "mode": "b3_cloud_simulation",
+      "provider": "BTG Pactual Trader API"
+    }
+  ]
+}
