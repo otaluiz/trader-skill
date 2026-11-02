@@ -7,7 +7,7 @@ import asyncio
 import os
 import sys
 from typing import Dict, List, Optional
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -27,6 +27,7 @@ from trader_engine.strategy import StrategyEngine
 from backend.trade_manager import TradeManager
 from backend.auto_trader import AutoTrader
 from backend.bento_service import BentoService
+from backend.auth import auth_manager, require_auth, optional_auth
 
 app = FastAPI(
     title="Trader Skill Web API",
@@ -82,6 +83,13 @@ class ProposeTradeRequest(BaseModel):
     rationale: Optional[str] = ""
 
 
+class GoogleVerifyRequest(BaseModel):
+    credential: str
+
+class GoogleDemoLoginRequest(BaseModel):
+    email: Optional[str] = None
+    name: Optional[str] = None
+
 class ConfigUpdateRequest(BaseModel):
     budget: Optional[float] = None
     cash_buffer_pct: Optional[float] = None
@@ -119,6 +127,65 @@ class ConfigUpdateRequest(BaseModel):
     auto_trading_order_size_usd: Optional[float] = None
     auto_trading_min_confidence: Optional[int] = None
     auto_trading_current_spent_usd: Optional[float] = None
+    google_auth_enabled: Optional[bool] = None
+    google_client_id: Optional[str] = None
+    google_client_secret: Optional[str] = None
+    google_allowed_emails: Optional[List[str]] = None
+
+
+# Google Authentication Endpoints
+@app.get("/api/auth/status")
+def get_auth_status(request: Request):
+    """Returns Google OAuth2 configuration and current session status."""
+    return auth_manager.get_status(request)
+
+
+@app.post("/api/auth/google/verify")
+def verify_google_login(req: GoogleVerifyRequest, response: Response):
+    """Validates Google Identity Services (GSI) ID token and issues secure session JWT."""
+    try:
+        user_info = auth_manager.verify_google_id_token(req.credential)
+        token = auth_manager.create_session_token(user_info)
+        response.set_cookie(
+            key=auth_manager.SESSION_COOKIE_NAME,
+            value=token,
+            httponly=True,
+            max_age=86400,
+            samesite="lax",
+            secure=False
+        )
+        return {"success": True, "token": token, "user": user_info}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/auth/google/demo-login")
+def demo_google_login(response: Response, req: Optional[GoogleDemoLoginRequest] = None):
+    """Enables quick local login for testing/demo when Google Client ID is not configured."""
+    user_info = auth_manager.create_demo_user()
+    if req and req.email:
+        user_info["email"] = req.email
+    if req and req.name:
+        user_info["name"] = req.name
+    token = auth_manager.create_session_token(user_info)
+    response.set_cookie(
+        key=auth_manager.SESSION_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        max_age=86400,
+        samesite="lax",
+        secure=False
+    )
+    return {"success": True, "token": token, "user": user_info}
+
+
+@app.post("/api/auth/logout")
+def logout(response: Response):
+    """Clears session cookie and invalidates user login."""
+    response.delete_cookie(auth_manager.SESSION_COOKIE_NAME)
+    return {"success": True, "message": "Sessão encerrada com sucesso."}
 
 
 @app.get("/api/health")
@@ -267,7 +334,7 @@ def get_recommendations():
 
 
 @app.post("/api/trades/propose")
-def propose_trade(req: ProposeTradeRequest):
+def propose_trade(req: ProposeTradeRequest, user: Dict = Depends(require_auth)):
     """Generates an order ticket and runs pre-trade risk validation."""
     try:
         ticket = trade_mgr.propose_order(
@@ -297,7 +364,7 @@ def list_tickets(status: Optional[str] = None):
 
 
 @app.post("/api/trades/{ticket_id}/approve")
-def approve_ticket(ticket_id: str):
+def approve_ticket(ticket_id: str, user: Dict = Depends(require_auth)):
     """Records user explicit approval for the trade ticket."""
     try:
         updated = trade_mgr.approve_ticket(ticket_id)
@@ -307,7 +374,7 @@ def approve_ticket(ticket_id: str):
 
 
 @app.post("/api/trades/{ticket_id}/execute")
-def execute_ticket(ticket_id: str):
+def execute_ticket(ticket_id: str, user: Dict = Depends(require_auth)):
     """Executes the approved trade ticket on Binance, Alpaca (US), or MT5 (B3)."""
     try:
         executed = trade_mgr.execute_ticket(ticket_id)
@@ -317,7 +384,7 @@ def execute_ticket(ticket_id: str):
 
 
 @app.post("/api/trades/{ticket_id}/cancel")
-def cancel_ticket(ticket_id: str):
+def cancel_ticket(ticket_id: str, user: Dict = Depends(require_auth)):
     """Cancels a pending or approved trade ticket."""
     try:
         cancelled = trade_mgr.cancel_ticket(ticket_id)
@@ -397,11 +464,13 @@ def get_config():
         safe_cfg["binance_api_secret_masked"] = safe_cfg["binance_api_secret"][:4] + "..." + safe_cfg["binance_api_secret"][-4:]
     if safe_cfg.get("alpaca_api_secret"):
         safe_cfg["alpaca_api_secret_masked"] = safe_cfg["alpaca_api_secret"][:4] + "..." + safe_cfg["alpaca_api_secret"][-4:]
+    if safe_cfg.get("google_client_secret"):
+        safe_cfg["google_client_secret_masked"] = safe_cfg["google_client_secret"][:4] + "..." + safe_cfg["google_client_secret"][-4:]
     return safe_cfg
 
 
 @app.post("/api/config")
-def update_config(req: ConfigUpdateRequest):
+def update_config(req: ConfigUpdateRequest, user: Dict = Depends(require_auth)):
     updates = {k: v for k, v in req.dict().items() if v is not None}
     trade_mgr.save_config(updates)
     return {"success": True, "config": trade_mgr.load_config()}
@@ -415,13 +484,13 @@ def get_autotrading_status():
 
 
 @app.post("/api/autotrading/run")
-def trigger_autotrading_cycle():
+def trigger_autotrading_cycle(user: Dict = Depends(require_auth)):
     """Manually triggers an automated scanning and execution cycle."""
     return auto_trader.run_cycle()
 
 
 @app.post("/api/autotrading/reset-spend")
-def reset_autotrading_spend():
+def reset_autotrading_spend(user: Dict = Depends(require_auth)):
     """Resets the spent quota for automated trading back to zero."""
     return auto_trader.reset_spend()
 

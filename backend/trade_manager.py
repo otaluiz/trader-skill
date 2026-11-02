@@ -69,7 +69,12 @@ DEFAULT_CONFIG = {
     "blocked": [],
     "allow_crypto": True,
     "allow_b3": True,
-    "allow_options": False
+    "allow_options": False,
+    "google_auth_enabled": False,
+    "google_client_id": "",
+    "google_client_secret": "",
+    "google_allowed_emails": [],
+    "jwt_secret_key": ""
 }
 
 

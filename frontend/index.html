@@ -138,6 +138,8 @@
     .fpb .vb-badge:hover .vb-arr{width:12px;margin-left:0;opacity:1;transform:none}
     @media (prefers-reduced-motion: reduce){.fpb .card{transition:none}}
   </style>
+  <!-- Google Identity Services (GSI) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="text-slate-100 min-h-screen flex flex-col">
 
@@ -188,7 +190,7 @@
         </div>
       </div>
 
-      <!-- Quick Action Buttons -->
+      <!-- Quick Action Buttons & Google Auth -->
       <div class="flex items-center space-x-3">
         <button onclick="refreshData()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Atualizar Dados">
           <i class="ph-bold ph-arrows-clockwise text-lg"></i>
@@ -197,6 +199,19 @@
           <i class="ph-bold ph-gear text-base"></i>
           <span>Configurações</span>
         </button>
+
+        <!-- Google User Profile / Login Button Container -->
+        <div id="googleAuthContainer" class="flex items-center pl-1 border-l border-cardBorder">
+          <button onclick="openLoginModal()" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium text-xs border border-white/20 transition">
+            <svg width="15" height="15" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span>Entrar com Google</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -964,6 +979,63 @@
           </div>
         </div>
 
+        <!-- ==================== SEÇÃO 6: AUTENTICAÇÃO E SEGURANÇA GOOGLE (OAUTH 2.0) ==================== -->
+        <div class="bg-cardBg border border-blue-500/30 rounded-xl p-6 space-y-4 shadow-xl">
+          <div class="flex items-center justify-between pb-3 border-b border-cardBorder">
+            <div class="flex items-center space-x-3">
+              <div class="w-9 h-9 rounded-lg bg-white/10 text-white flex items-center justify-center text-xl font-bold">
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+              </div>
+              <div>
+                <h4 class="font-bold text-white text-sm">Segurança & Autenticação Google (OAuth 2.0)</h4>
+                <p class="text-xs text-slate-400">Proteja a plataforma exigindo login oficial com conta Google autorizada.</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-2">
+              <input type="checkbox" id="cfgGoogleAuthEnabled" class="rounded bg-slate-900 border-cardBorder text-binance h-4 w-4">
+              <label for="cfgGoogleAuthEnabled" class="text-xs text-white font-bold cursor-pointer">Ativar Login Obrigatório</label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Google OAuth Client ID</label>
+              <input type="text" id="cfgGoogleClientId" placeholder="ex: 123456789-abc.apps.googleusercontent.com" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono focus:border-binance outline-none">
+              <p class="text-[11px] text-slate-500 mt-1">Obtido no Google Cloud Console &gt; APIs &amp; Services &gt; Credentials</p>
+            </div>
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Google Client Secret (Opcional)</label>
+              <input type="password" id="cfgGoogleClientSecret" placeholder="••••••••••••••••" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono focus:border-binance outline-none">
+              <p class="text-[11px] text-slate-500 mt-1">Chave secreta para validação em servidor</p>
+            </div>
+          </div>
+
+          <div class="text-xs">
+            <label class="block text-slate-400 font-semibold mb-1">Whitelist de E-mails Autorizados (Separados por vírgula)</label>
+            <input type="text" id="cfgGoogleAllowedEmails" placeholder="ex: seunome@gmail.com, admin@empresa.com, *@minhaempresa.com" class="w-full bg-slate-900 border border-cardBorder rounded-lg px-3 py-2 text-white mono focus:border-binance outline-none">
+            <p class="text-[11px] text-slate-500 mt-1">Deixe em branco para permitir qualquer conta Google autenticada, ou restrinja para e-mails específicos e domínios.</p>
+          </div>
+
+          <div class="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 flex items-start gap-2.5">
+            <i class="ph-bold ph-info text-base text-blue-400 mt-0.5"></i>
+            <div class="space-y-1">
+              <div class="font-semibold text-white">Como obter seu Google Client ID gratuitamente:</div>
+              <ol class="list-decimal list-inside space-y-0.5 text-[11px] text-blue-200">
+                <li>Acesse o <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="underline hover:text-white">Google Cloud Console</a> e crie ou selecione um projeto.</li>
+                <li>Vá em <strong>APIs &amp; Serviços &gt; Credenciais &gt; Criar Credenciais &gt; ID do cliente OAuth</strong>.</li>
+                <li>Selecione Tipo de aplicativo: <strong>Aplicativo da Web</strong>.</li>
+                <li>Em Origens JavaScript autorizadas, adicione <code>http://localhost:8000</code>.</li>
+                <li>Copie o <strong>ID do Cliente</strong> gerado e cole no campo acima.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
         <div class="pt-2 flex justify-end">
           <button onclick="saveSettings()" class="px-8 py-3 rounded-xl font-bold text-sm bg-binance hover:bg-binanceHover text-slate-950 transition shadow-xl shadow-binance/20 flex items-center gap-2">
             <i class="ph-bold ph-check text-lg"></i>
@@ -1062,6 +1134,51 @@
       <div class="pt-3 border-t border-cardBorder flex items-center justify-end space-x-3">
         <button onclick="closeModal()" class="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold">Cancelar</button>
         <button id="modalApproveBtn" class="px-5 py-2 rounded-lg bg-accentGreen hover:bg-emerald-600 text-white text-xs font-bold shadow-lg shadow-emerald-500/20">Aprovar e Executar (Yes)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL DE AUTENTICAÇÃO GOOGLE ==================== -->
+  <div id="googleLoginModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+    <div class="bg-cardBg border border-cardBorder rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-center relative overflow-hidden">
+      <div class="absolute -top-12 -left-12 w-36 h-36 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-12 -right-12 w-36 h-36 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Close Button -->
+      <button id="closeLoginModalBtn" onclick="closeLoginModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white transition p-1">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+
+      <div class="mx-auto w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-inner">
+        <svg width="28" height="28" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+      </div>
+
+      <div>
+        <h3 class="text-xl font-bold text-white tracking-tight">Login Seguro com Google</h3>
+        <p id="loginModalMsg" class="text-xs text-slate-400 mt-1">Conecte sua Conta Google oficial para autenticar operações de trading.</p>
+      </div>
+
+      <!-- Container para o Botão Oficial do Google Identity Services -->
+      <div id="gsiModalButtonContainer" class="flex justify-center my-3 min-h-[44px]"></div>
+
+      <div class="relative flex items-center justify-center my-2">
+        <div class="border-t border-cardBorder w-full"></div>
+        <span class="bg-cardBg px-3 text-[11px] text-slate-500 uppercase font-medium">Ou em Modo Sandbox</span>
+      </div>
+
+      <!-- Botão de Login Demonstração -->
+      <button onclick="handleDemoGoogleLogin()" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-cardBorder transition flex items-center justify-center gap-2">
+        <i class="ph-bold ph-user-circle text-base text-binance"></i>
+        <span>Entrar como Luiz Trader (Simulação / Testes)</span>
+      </button>
+
+      <div class="text-[11px] text-slate-500">
+        Protegido por token de sessão JWT assinado criptograficamente.
       </div>
     </div>
   </div>

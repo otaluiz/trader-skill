@@ -1,8 +1,8 @@
 {
-  "cash_brl": 9240.0,
+  "cash_brl": 9050.0,
   "positions": {
     "PETR4": {
-      "shares": 120,
+      "shares": 125,
       "avg_price": 38.5
     },
     "VALE3": {
@@ -102,6 +102,30 @@
     {
       "order_id": "B3-CLOUD-1793579665139",
       "timestamp": 1793579665.1399753,
+      "symbol": "PETR4",
+      "side": "SELL",
+      "quantity": 5,
+      "price": 39.0,
+      "notional_brl": 195.0,
+      "status": "FILLED",
+      "mode": "b3_cloud_simulation",
+      "provider": "BTG Pactual Trader API"
+    },
+    {
+      "order_id": "B3-CLOUD-1793637387165",
+      "timestamp": 1793637387.1653886,
+      "symbol": "PETR4",
+      "side": "BUY",
+      "quantity": 10,
+      "price": 38.5,
+      "notional_brl": 385.0,
+      "status": "FILLED",
+      "mode": "b3_cloud_simulation",
+      "provider": "BTG Pactual Trader API"
+    },
+    {
+      "order_id": "B3-CLOUD-1793637387176",
+      "timestamp": 1793637387.1763203,
       "symbol": "PETR4",
       "side": "SELL",
       "quantity": 5,

@@ -35,6 +35,7 @@ let modalCachedCandlesData = [];
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
+  checkAuthStatus();
   initChart();
   refreshData();
   loadAutoTradingStatus();
@@ -45,6 +46,201 @@ document.addEventListener('DOMContentLoaded', () => {
     loadAutoTradingStatus();
   }, 10000);
 });
+
+// ==========================================
+// GOOGLE AUTHENTICATION & SECURITY ENGINE
+// ==========================================
+let currentAuthUser = null;
+let googleAuthSettings = null;
+
+function authFetch(url, options = {}) {
+  const token = localStorage.getItem('trader_jwt_token');
+  options.headers = options.headers || {};
+  if (token) {
+    if (options.headers instanceof Headers) {
+      options.headers.set('Authorization', `Bearer ${token}`);
+    } else {
+      options.headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  return fetch(url, options).then(res => {
+    if (res.status === 401) {
+      openLoginModal('Sessão expirada ou não autorizada. Faça login com o Google para continuar.');
+    }
+    return res;
+  });
+}
+
+async function checkAuthStatus() {
+  try {
+    const token = localStorage.getItem('trader_jwt_token');
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch('/api/auth/status', { headers });
+    if (!res.ok) return;
+    googleAuthSettings = await res.json();
+    currentAuthUser = googleAuthSettings.user || null;
+
+    renderAuthUI();
+    initGoogleIdentityServices();
+
+    if (googleAuthSettings.enabled && !currentAuthUser) {
+      openLoginModal('O Modo de Segurança Google está ATIVO. Autentique-se para operar.');
+    }
+  } catch (err) {
+    console.error('Erro ao verificar status de autenticação:', err);
+  }
+}
+
+function initGoogleIdentityServices() {
+  if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+    setTimeout(initGoogleIdentityServices, 600);
+    return;
+  }
+
+  const clientId = googleAuthSettings?.client_id;
+  if (!clientId) {
+    return;
+  }
+
+  try {
+    google.accounts.id.initialize({
+      client_id: clientId,
+      callback: handleGoogleCredentialResponse,
+      auto_select: false,
+      cancel_on_tap_outside: !googleAuthSettings?.enabled
+    });
+
+    const modalContainer = document.getElementById('gsiModalButtonContainer');
+    if (modalContainer) {
+      modalContainer.innerHTML = '';
+      google.accounts.id.renderButton(modalContainer, {
+        theme: 'filled_black',
+        size: 'large',
+        shape: 'pill',
+        text: 'signin_with',
+        locale: 'pt-BR',
+        width: 280
+      });
+    }
+  } catch (e) {
+    console.warn('GSI initialize:', e);
+  }
+}
+
+async function handleGoogleCredentialResponse(response) {
+  const credential = response.credential;
+  if (!credential) return;
+
+  try {
+    const res = await fetch('/api/auth/google/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      localStorage.setItem('trader_jwt_token', data.token);
+      currentAuthUser = data.user;
+      showToast(`Bem-vindo, ${data.user.name}! Login com Google realizado.`);
+      closeLoginModal();
+      renderAuthUI();
+      refreshData();
+    } else {
+      showToast(data.detail || 'Falha ao autenticar com Google', false);
+    }
+  } catch (err) {
+    showToast('Erro de conexão ao validar token Google', false);
+  }
+}
+
+async function handleDemoGoogleLogin(email = null, name = null) {
+  try {
+    const res = await fetch('/api/auth/google/demo-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      localStorage.setItem('trader_jwt_token', data.token);
+      currentAuthUser = data.user;
+      showToast(`Login Conectado: ${data.user.name} (${data.user.email})`);
+      closeLoginModal();
+      renderAuthUI();
+      refreshData();
+    }
+  } catch (err) {
+    showToast('Erro ao realizar login demonstrativo', false);
+  }
+}
+
+async function handleLogout() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } catch (e) {}
+  localStorage.removeItem('trader_jwt_token');
+  currentAuthUser = null;
+  if (window.google?.accounts?.id) {
+    google.accounts.id.disableAutoSelect();
+  }
+  showToast('Sessão encerrada com sucesso.');
+  renderAuthUI();
+  if (googleAuthSettings?.enabled) {
+    openLoginModal('Autenticação necessária para continuar.');
+  }
+}
+
+function renderAuthUI() {
+  const container = document.getElementById('googleAuthContainer');
+  if (!container) return;
+
+  if (currentAuthUser) {
+    container.innerHTML = `
+      <div class="flex items-center space-x-2 bg-slate-900 border border-cardBorder rounded-lg px-2.5 py-1 text-xs">
+        <img src="${currentAuthUser.picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80'}" class="w-6 h-6 rounded-full object-cover border border-white/20" alt="Avatar">
+        <div class="flex flex-col text-left">
+          <span class="font-bold text-white text-[11px] leading-tight flex items-center gap-1">
+            <span>${currentAuthUser.name.split(' ')[0]}</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          </span>
+          <span class="text-[10px] text-slate-400 leading-tight">${currentAuthUser.email}</span>
+        </div>
+        <button onclick="handleLogout()" class="ml-1 text-slate-400 hover:text-rose-400 p-1 transition" title="Encerrar Sessão">
+          <i class="ph-bold ph-sign-out text-sm"></i>
+        </button>
+      </div>`;
+  } else {
+    container.innerHTML = `
+      <button onclick="openLoginModal()" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium text-xs border border-white/20 transition shadow-sm">
+        <svg width="15" height="15" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        <span>Entrar com Google</span>
+      </button>`;
+  }
+}
+
+function openLoginModal(msg = null) {
+  const modal = document.getElementById('googleLoginModal');
+  const msgEl = document.getElementById('loginModalMsg');
+  if (msg && msgEl) msgEl.innerText = msg;
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeLoginModal() {
+  if (googleAuthSettings?.enabled && !currentAuthUser) {
+    showToast('Login necessário para acessar a plataforma.', false);
+    return;
+  }
+  const modal = document.getElementById('googleLoginModal');
+  if (modal) modal.classList.add('hidden');
+}
 
 // Toast notification
 function showToast(msg, isSuccess = true) {
@@ -434,7 +630,7 @@ function proposeQuickTrade(symbol, market, price) {
 // Create and Inspect Proposal
 async function createAndInspectProposal(symbol, side, market, notional, limitPrice, sl, tp, rationale) {
   try {
-    const res = await fetch('/api/trades/propose', {
+    const res = await authFetch('/api/trades/propose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -471,7 +667,7 @@ async function submitOrderProposal() {
   const tp = parseFloat(document.getElementById('orderTP').value) || null;
 
   try {
-    const res = await fetch('/api/trades/propose', {
+    const res = await authFetch('/api/trades/propose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -724,7 +920,7 @@ function renderTickets(tickets) {
 
 async function cancelTicket(ticketId) {
   try {
-    const res = await fetch(`/api/trades/${ticketId}/cancel`, { method: 'POST' });
+    const res = await authFetch(`/api/trades/${ticketId}/cancel`, { method: 'POST' });
     if (res.ok) {
       showToast('Ordem cancelada.');
       loadTickets();
@@ -1418,7 +1614,7 @@ async function loadAutoTradingStatus() {
 async function triggerAutoTradingRun() {
   try {
     showToast('Executando ciclo de varredura automática...');
-    const res = await fetch('/api/autotrading/run', { method: 'POST' });
+    const res = await authFetch('/api/autotrading/run', { method: 'POST' });
     const data = await res.json();
     if (data.status === 'disabled') {
       showToast('O robô está desativado nas configurações.', false);
@@ -1438,7 +1634,7 @@ async function triggerAutoTradingRun() {
 // Reset spend limit quota
 async function resetAutoTradingSpend() {
   try {
-    const res = await fetch('/api/autotrading/reset-spend', { method: 'POST' });
+    const res = await authFetch('/api/autotrading/reset-spend', { method: 'POST' });
     if (res.ok) {
       showToast('Quota de saldo automático reiniciada com sucesso!');
       loadAutoTradingStatus();
@@ -1523,6 +1719,19 @@ async function loadConfigForm() {
     }
     toggleB3ConnTypeUI();
 
+    // 6. Google Auth & Security
+    const gAuthToggle = document.getElementById('cfgGoogleAuthEnabled');
+    if (gAuthToggle) gAuthToggle.checked = !!cfg.google_auth_enabled;
+    const gClientId = document.getElementById('cfgGoogleClientId');
+    if (gClientId) gClientId.value = cfg.google_client_id || '';
+    const gClientSecret = document.getElementById('cfgGoogleClientSecret');
+    if (gClientSecret) gClientSecret.value = cfg.google_client_secret_masked || cfg.google_client_secret || '';
+    const gAllowed = document.getElementById('cfgGoogleAllowedEmails');
+    if (gAllowed) {
+      const emails = cfg.google_allowed_emails || [];
+      gAllowed.value = emails.join(', ');
+    }
+
     // 5. Global Risk
     document.getElementById('cfgBudget').value = cfg.budget || 100.0;
     document.getElementById('cfgMaxOrder').value = cfg.max_order_usd || 25.0;
@@ -1579,6 +1788,15 @@ async function saveSettings() {
     auto_trading_order_size_usd: parseFloat(document.getElementById('cfgAutoTradingOrderSize')?.value) || 10.0,
     auto_trading_min_confidence: parseInt(document.getElementById('cfgAutoTradingMinConf')?.value) || 80,
 
+    // Google Auth & Security
+    google_auth_enabled: document.getElementById('cfgGoogleAuthEnabled')?.checked || false,
+    google_client_id: document.getElementById('cfgGoogleClientId')?.value.trim() || '',
+    google_client_secret: document.getElementById('cfgGoogleClientSecret')?.value.trim() || '',
+    google_allowed_emails: (document.getElementById('cfgGoogleAllowedEmails')?.value || '')
+      .split(',')
+      .map(s => s.trim().toLowerCase())
+      .filter(Boolean),
+
     // Global Risk
     budget: parseFloat(document.getElementById('cfgBudget').value) || 100.0,
     max_order_usd: parseFloat(document.getElementById('cfgMaxOrder').value) || 25.0,
@@ -1588,7 +1806,7 @@ async function saveSettings() {
   };
 
   try {
-    const res = await fetch('/api/config', {
+    const res = await authFetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
