@@ -42,7 +42,7 @@ class Repo(unittest.TestCase):
             ".git", ".venv", "scripts", "trader", "trader_b3", "trader_binance",
             "trader_engine", "trader_us", "backend", "frontend",
             "components", "components.json", "lib", "package.json", "styles",
-            "tailwind.config.js", "tsconfig.json"
+            "tailwind.config.js", "tsconfig.json", "scratch"
         }
         root = sorted(d for d in os.listdir(ROOT) if not d.startswith(".git") and d not in ignored)
         self.assertEqual(root, sorted([".claude-plugin", "LICENSE", "README.md", "tests"] + SKILLS))

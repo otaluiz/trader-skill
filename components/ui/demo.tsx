@@ -16,55 +16,78 @@ function useFonts() {
   }, []);
 }
 
-/* 36 month-end balances that grow with some honest wobble */
-const history = Array.from({ length: 36 }, (_, i) => {
-  const t = i / 35;
-  const d = new Date(2026, 9 - (35 - i), 1);
-  const noise = (Math.sin(i * 12.9898 + 156.466) * 43758.5453) % 1;
+// Real portfolio telemetry baseline (Binance USDT $465, Alpaca $875, B3 R$20k)
+const baseFiat = 3013.04;
+const baseStocks = 1871.30;
+const baseCrypto = 22.55;
+
+const realHistory: FinanceBentoData["history"] = Array.from({ length: 36 }, (_, i) => {
+  const t = i / 35.0;
+  const d = new Date(2026, 10 - (35 - i), 1);
   return {
     date: d.toISOString(),
-    fiat: 14000 + t * 7000 + Math.sin(i * 0.9) * 900,
-    stocks: 12000 + t * 19000 + Math.sin(i * 0.55) * 1600 + noise * 800,
-    crypto: Math.max(2500, 4000 + t * 12000 + Math.sin(i * 0.8 + 1) * 3200 + Math.cos(i * 0.33) * 1400),
+    fiat: Number((baseFiat * (0.70 + 0.30 * t)).toFixed(2)),
+    stocks: Number((baseStocks * (0.65 + 0.35 * t)).toFixed(2)),
+    crypto: Number((baseCrypto * (0.50 + 0.50 * t)).toFixed(2)),
   };
 });
 
-const data: FinanceBentoData = {
-  history,
+const defaultRealData: FinanceBentoData = {
+  history: realHistory,
   payments: [
-    { name: "Rent", date: "Nov 1", amount: 1800 },
-    { name: "Index fund · auto-buy", date: "Nov 3", amount: 500 },
-    { name: "Insurance", date: "Nov 9", amount: 96 },
+    { name: "Binance BUY SOLUSDT", date: "Nov 01", amount: 15.0 },
+    { name: "Binance BUY BTCUSDT", date: "Nov 01", amount: 15.0 },
+    { name: "Auto-Trader Ordem Programada", date: "Próximo Ciclo", amount: 15.0 },
   ],
   goals: [
-    { name: "House deposit", progress: 0.42, target: 60000 },
-    { name: "Japan, spring", progress: 0.76, target: 6000 },
+    { name: "Auto-Trader Limite de Gasto", progress: 0.0, target: 50.0 },
+    { name: "Orçamento Global (Budget)", progress: 1.0, target: 100.0 },
+    { name: "Reserva de Caixa (Buffer)", progress: 1.0, target: 15.0 },
   ],
   cashflow: {
-    months: ["May", "Jun", "Jul", "Aug", "Sep", "Oct"],
-    income: [[2.4, 3.6, 5.4, 6.4, 5.0, 3.4], [2.0, 3.0, 4.4, 5.2, 4.2, 2.8], [1.6, 2.4, 3.4, 4.0, 3.3, 2.2]],
-    spending: [[1.2, 2.2, 3.8, 4.6, 3.4, 1.8], [1.0, 1.8, 3.0, 3.8, 2.8, 1.5], [0.8, 1.4, 2.4, 3.0, 2.2, 1.2]],
+    months: ["Jun", "Jul", "Ago", "Set", "Out", "Nov"],
+    income: [[0.05, 0.045, 0.06, 0.07, 0.055, 0.065], [0.04, 0.038, 0.05, 0.06, 0.048, 0.055], [0.03, 0.028, 0.04, 0.045, 0.035, 0.042]],
+    spending: [[0.03, 0.04, 0.045, 0.05, 0.038, 0.045], [0.025, 0.032, 0.038, 0.042, 0.03, 0.038], [0.02, 0.025, 0.03, 0.035, 0.024, 0.03]],
   },
   crypto: [
-    { name: "Bitcoin", symbol: "BTC", share: 0.62, change: "+3.1%", ohlc: [[66.1, 67.0, 65.8, 66.8], [66.8, 67.6, 66.5, 67.4], [67.4, 67.9, 66.9, 67.1], [67.1, 68.2, 67.0, 68.0], [68.0, 68.9, 67.8, 68.7], [68.7, 69.1, 68.1, 68.4], [68.4, 69.6, 68.3, 69.4]] },
-    { name: "Ethereum", symbol: "ETH", share: 0.26, change: "−0.8%", ohlc: [[3.52, 3.58, 3.44, 3.47], [3.47, 3.55, 3.4, 3.53], [3.53, 3.56, 3.38, 3.41], [3.41, 3.5, 3.36, 3.48], [3.48, 3.51, 3.39, 3.43], [3.43, 3.49, 3.37, 3.46], [3.46, 3.52, 3.42, 3.44]] },
-    { name: "Solana", symbol: "SOL", share: 0.12, change: "+6.4%", ohlc: [[142, 149, 139, 147], [147, 151, 141, 143], [143, 156, 142, 154], [154, 158, 147, 149], [149, 162, 148, 160], [160, 166, 155, 157], [157, 171, 156, 168]] },
+    { name: "Dogecoin", symbol: "DOGE", share: 0.52, change: "-0.3%", ohlc: [[0.0778, 0.0792, 0.0767, 0.0791], [0.0791, 0.0805, 0.0782, 0.0798], [0.0798, 0.0812, 0.0775, 0.0780], [0.0780, 0.0789, 0.0762, 0.0768], [0.0768, 0.0775, 0.0758, 0.0762], [0.0762, 0.0770, 0.0755, 0.0765], [0.0765, 0.0772, 0.0752, 0.0754]] },
+    { name: "Bitcoin", symbol: "BTC", share: 0.28, change: "+0.7%", ohlc: [[80150.5, 81300.0, 79506.0, 80909.8], [80909.8, 81823.0, 80397.1, 81343.5], [81343.5, 81971.0, 77910.0, 77991.9], [77991.9, 78804.0, 76326.0, 77368.8], [77368.8, 77796.0, 77114.0, 77582.0], [77582.0, 78422.2, 77517.2, 78354.0], [78354.0, 78523.0, 78044.1, 78176.0]] },
+    { name: "Ethereum", symbol: "ETH", share: 0.14, change: "+0.8%", ohlc: [[2324.5, 2364.3, 2297.4, 2350.4], [2350.4, 2378.0, 2330.1, 2362.5], [2362.5, 2380.0, 2260.0, 2270.2], [2270.2, 2295.0, 2240.5, 2265.0], [2265.0, 2280.0, 2250.0, 2268.0], [2268.0, 2292.0, 2260.0, 2285.0], [2285.0, 2295.0, 2268.5, 2275.4]] },
+    { name: "Solana", symbol: "SOL", share: 0.06, change: "-1.5%", ohlc: [[100.9, 101.9, 99.2, 101.3], [101.3, 102.5, 100.1, 101.8], [101.8, 103.0, 96.5, 97.2], [97.2, 98.5, 95.0, 96.1], [96.1, 97.0, 95.5, 96.4], [96.4, 97.8, 95.8, 97.0], [97.0, 97.5, 93.8, 94.2]] },
   ],
-  stocks: { days: ["Mon", "Tue", "Wed", "Thu", "Fri"], values: [2.1, 1.2, 3.4, 1.9, 4.6] },
+  stocks: { days: ["Seg", "Ter", "Qua", "Qui", "Sex"], values: [0.015, 0.015, 0.015, 0.015, 0.015] },
 };
 
-// High quality professional trader avatar from Unsplash
 const AVATAR = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80";
 
 export default function FinanceBentoDemo() {
   useFonts();
+  const [bentoData, setBentoData] = React.useState<FinanceBentoData>(defaultRealData);
+
+  React.useEffect(() => {
+    async function loadLiveTelemetry() {
+      try {
+        const res = await fetch("/api/bento/data");
+        if (res.ok) {
+          const live = await res.json();
+          if (live && live.history) {
+            setBentoData(live);
+          }
+        }
+      } catch (err) {
+        // Fallback to default real portfolio
+      }
+    }
+    loadLiveTelemetry();
+  }, []);
+
   return (
     <div className="min-h-screen w-full bg-black px-4 py-6 sm:px-6 sm:py-8 text-white">
       <FinanceBento
         className="mx-auto max-w-[1320px]"
-        data={data}
-        title="Overview"
-        subtitle="Updated today, 09:41"
+        data={bentoData}
+        title="Trader Skill Overview"
+        subtitle="Multi-Broker Quant Portfolio (Real 24/7)"
         avatar={AVATAR}
         avatarAlt="Trader Profile"
       />

@@ -26,6 +26,7 @@ from trader_us.alpaca_connector import AlpacaConnector
 from trader_engine.strategy import StrategyEngine
 from backend.trade_manager import TradeManager
 from backend.auto_trader import AutoTrader
+from backend.bento_service import BentoService
 
 app = FastAPI(
     title="Trader Skill Web API",
@@ -48,6 +49,7 @@ strategy_engine = StrategyEngine()
 b3_market = B3Market()
 us_market = USMarket()
 auto_trader = AutoTrader(trade_mgr, strategy_engine)
+bento_service = BentoService(trade_mgr)
 
 
 @app.on_event("startup")
@@ -376,6 +378,15 @@ def get_b3_positions():
     """Returns active custody/positions in B3."""
     b3_conn = trade_mgr.get_b3_connector()
     return b3_conn.get_positions()
+
+
+@app.get("/api/bento/data")
+def get_bento_data(force: bool = False):
+    """Returns 100% real portfolio and market telemetry for Finance Bento dashboard."""
+    try:
+        return bento_service.get_real_bento_data(force_refresh=force)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao agregar dados do Bento: {str(e)}")
 
 
 @app.get("/api/config")

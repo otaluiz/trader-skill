@@ -299,7 +299,7 @@ const cash=$id('cash');
 cash.innerHTML=`<div class="in-c"><div class="row" style="justify-content:space-between"><div class="cap">Free cash</div><span class="muted">Runway</span></div>
   <div class="row" style="margin-top:14px;align-items:baseline;justify-content:space-between"><span class="big csv" style="font-size:38px">0</span><span class="mono" style="font-size:20px;font-weight:500"><span class="crw">0</span><span class="muted" style="font-size:12px"> mo</span></span></div>
   <svg class="cst" width="100%" height="22" style="position:absolute;left:24px;right:24px;bottom:22px;width:calc(100% - 48px)" aria-hidden="true"></svg></div>`;
-function updateCash(){const v=nwData[nwData.length-1].fiat*.42,mo=v/2100;tween(cash.querySelector('.csv'),v,x=>money(x));tween(cash.querySelector('.crw'),mo,x=>x.toFixed(1));
+function updateCash(){const v=nwData[nwData.length-1].fiat,mo=v/Math.max(10,data.goals?.[1]?.target||100);tween(cash.querySelector('.csv'),v,x=>money(x));tween(cash.querySelector('.crw'),mo,x=>x.toFixed(1));
   const svg=cash.querySelector('.cst'),W=svg.getBoundingClientRect().width||220,n=36;let s='';
   for(let i=0;i<n;i++){const x=1+i*(W-2)/(n-1),on=i/(n-1)<=mo/12;s+=`<line x1="${x}" x2="${x}" y1="${i%6===0?2:8}" y2="20" stroke="${on?ACC:'rgba(255,255,255,.28)'}" stroke-width="1.6" stroke-linecap="round" style="transition:stroke .2s ${i*14}ms"/>`}
   svg.innerHTML=s+`<text x="${W}" y="0" dy="-4" text-anchor="end" font-size="10" fill="${T3}" font-family="Geist Mono">12 mo</text>`}
@@ -322,13 +322,15 @@ function updateGoals(){goals.innerHTML=`<div class="in-c"><div class="row" style
 
 /* ---- Cash flow: mirrored waves, income above, spending below ---- */
 const flow=$id('flow');
-flow.innerHTML=`${bg(GR.pink)}<div class="in-c">
-  <div class="row" style="justify-content:space-between"><div><div class="ttl">Cash flow</div><div class="muted" style="margin-top:4px">Net <span class="mono" style="color:${ACC}">+$3,240</span> a month</div></div>
-    <div class="legend" style="flex-direction:column;gap:4px;align-items:flex-end"><span><i style="background:#fff"></i>Income</span><span><i style="background:#FFD0E6"></i>Spending</span></div></div>
-  <svg class="fls" style="position:absolute;left:0;bottom:12px" aria-hidden="true"></svg></div><div class="rim"></div>`;
 const MLAB=data.cashflow.months;
 const INC=data.cashflow.income;
 const SPN=data.cashflow.spending;
+const netMonthly = INC[0]?.length ? ((INC[0].reduce((a,b)=>a+b,0)-SPN[0].reduce((a,b)=>a+b,0))/INC[0].length)*1000 : 0;
+const netFlowStr = (netMonthly>=0?'+':'')+money(netMonthly);
+flow.innerHTML=`${bg(GR.pink)}<div class="in-c">
+  <div class="row" style="justify-content:space-between"><div><div class="ttl">Cash flow</div><div class="muted" style="margin-top:4px">Net <span class="mono" style="color:${ACC}">${netFlowStr}</span> a month</div></div>
+    <div class="legend" style="flex-direction:column;gap:4px;align-items:flex-end"><span><i style="background:#fff"></i>Income</span><span><i style="background:#FFD0E6"></i>Spending</span></div></div>
+  <svg class="fls" style="position:absolute;left:0;bottom:12px" aria-hidden="true"></svg></div><div class="rim"></div>`;
 let flowRaf=0;
 function updateFlow(instant){
   const svg=flow.querySelector('.fls'),W=flow.clientWidth,Hh=246,L=44,R=W-36,mid=Hh/2,lab=16,amp=mid-lab-8,max=7;
@@ -371,7 +373,7 @@ function candles(t){const d=OHLC[t].map(x=>x[3]),W=96,H=30,lo=Math.min(...d),hi=
     <path d="${smoothPath(P)}L${e[0]},${H}L${P[0][0]},${H}Z" fill="url(#${gid})"/><path d="${smoothPath(P)}" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="${e[0]}" cy="${e[1]}" r="3" fill="${up?ACC:'#fff'}" stroke="rgba(0,0,0,.35)" stroke-width="1"/></svg>`}
 const CHG=data.crypto.map(a=>a.change);
-function updateCrypto(){const v=nwData[nwData.length-1].crypto;tween(cr.querySelector('.crv'),v,x=>money(x));cr.querySelector('.crd').textContent='↑ 2.4%';
+function updateCrypto(){const v=nwData[nwData.length-1].crypto;tween(cr.querySelector('.crv'),v,x=>money(x));const avgChg=data.crypto?.[0]?.change||'+0.0%';cr.querySelector('.crd').textContent=avgChg;cr.querySelector('.crd').style.color=avgChg.startsWith('+')?ACC:T3;
   /* one thin segmented bar shows the split; tones of white, no colour dots */
   cr.querySelector('.crb').innerHTML=`<div style="display:flex;gap:3px;height:6px">${CA.map(([n,s,f],i)=>`<div style="flex:0 0 calc(${f*100}% - 2px);border-radius:3px;background:rgba(255,255,255,${[.95,.6,.32][i]});transform-origin:left;transform:scaleX(0);transition:transform .8s var(--ease) ${.1+i*.1}s" class="crs"></div>`).join('')}</div>
     <div style="display:flex;gap:3px;margin-top:7px">${CA.map(([n,s,f])=>`<span class="mono muted" style="flex:0 0 calc(${f*100}% - 2px);font-size:11px;white-space:nowrap">${s} ${Math.round(f*100)}%</span>`).join('')}</div>`;
@@ -383,8 +385,9 @@ function updateCrypto(){const v=nwData[nwData.length-1].crypto;tween(cr.querySel
 /* ---- Stocks: capsule columns per weekday ---- */
 const st=$id('stocks');
 const WK=data.stocks.days,WV=data.stocks.values;
+const totWkVol = WV.reduce((a,b)=>a+b,0)*1000;
 st.innerHTML=`${bg(GR.green)}<div class="in-c"><div class="ttl">Stocks</div>
-  <div style="margin-top:14px"><span class="big stv" style="font-size:34px">0</span></div><div class="row" style="margin-top:6px;gap:8px"><span class="delta">↑ 1.8%</span><span class="muted">this week</span></div>
+  <div style="margin-top:14px"><span class="big stv" style="font-size:34px">0</span></div><div class="row" style="margin-top:6px;gap:8px"><span class="delta">${money(totWkVol)}</span><span class="muted">this week</span></div>
   <svg class="sts" style="position:absolute;left:18px;bottom:14px" aria-hidden="true"></svg></div><div class="rim"></div>`;
 function updateStocks(instant){const v=nwData[nwData.length-1].stocks;if(!instant)tween(st.querySelector('.stv'),v,x=>money(x));
   const svg=st.querySelector('.sts'),W=st.clientWidth-36,Hh=160,pb=18,bw=22,max=5,gap=(W-24-bw*5)/4;svg.setAttribute('width',W);svg.setAttribute('height',Hh);

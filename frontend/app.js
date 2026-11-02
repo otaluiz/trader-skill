@@ -117,6 +117,7 @@ function switchTab(tabId) {
 
 // Refresh all data
 async function refreshData() {
+  fetchRealBentoData();
   await fetchMarketQuotes();
   await loadPortfolio();
   await loadRecommendations();
@@ -1622,67 +1623,52 @@ function loadCustomCrypto() {
 
 
 // ==========================================
-// FINANCE BENTO INTEGRATION ENGINE
+// FINANCE BENTO INTEGRATION ENGINE (REAL DATA)
 // ==========================================
 
-function getLiveBentoData() {
-  const p = latestPortfolioData || {};
-  const b = p.binance || {};
-  const balances = b.balances || [];
-  const usdtBal = balances.find(x => x.asset === 'USDT')?.free || 450.0;
-  
-  const currentFiat = Math.max(1000, usdtBal * 20 + 8000);
-  const currentStocks = 27000;
-  const currentCrypto = Math.max(3000, (b.total_estimated_usd || 500) * 15 + 4000);
+let latestBentoData = null;
 
-  // 36 months of history with realistic growth curve
-  const history = Array.from({ length: 36 }, (_, i) => {
-    const t = i / 35;
-    const d = new Date(2026, 9 - (35 - i), 1);
-    const noise = (Math.sin(i * 12.9898 + 156.466) * 43758.5453) % 1;
-    return {
-      date: d.toISOString(),
-      fiat: 12000 + t * (currentFiat - 12000) + Math.sin(i * 0.9) * 800,
-      stocks: 10000 + t * (currentStocks - 10000) + Math.sin(i * 0.55) * 1200 + noise * 600,
-      crypto: Math.max(2000, 3000 + t * (currentCrypto - 3000) + Math.sin(i * 0.8 + 1) * 2000 + Math.cos(i * 0.33) * 1000),
-    };
-  });
-
-  return {
-    history,
-    payments: [
-      { name: "Alpaca Auto-Buy (SPY)", date: "Nov 3", amount: 250 },
-      { name: "Binance DCA (BTC)", date: "Nov 5", amount: 100 },
-      { name: "B3 MT5 Margin Buffer", date: "Nov 8", amount: 350 },
-    ],
-    goals: [
-      { name: "Trader Capital Target", progress: 0.68, target: 50000 },
-      { name: "Crypto Reserve", progress: 0.84, target: 15000 },
-    ],
-    cashflow: {
-      months: ["May", "Jun", "Jul", "Aug", "Sep", "Oct"],
-      income: [[3.2, 4.5, 6.1, 7.2, 5.8, 4.2], [2.4, 3.8, 5.0, 6.0, 4.9, 3.5], [2.0, 2.9, 4.1, 4.8, 3.8, 2.8]],
-      spending: [[1.5, 2.4, 3.9, 4.8, 3.6, 2.1], [1.2, 2.0, 3.2, 4.0, 3.0, 1.8], [1.0, 1.6, 2.6, 3.2, 2.4, 1.4]],
-    },
-    crypto: [
-      { name: "Bitcoin", symbol: "BTC", share: 0.58, change: "+3.4%", ohlc: [[66.1, 67.0, 65.8, 66.8], [66.8, 67.6, 66.5, 67.4], [67.4, 67.9, 66.9, 67.1], [67.1, 68.2, 67.0, 68.0], [68.0, 68.9, 67.8, 68.7], [68.7, 69.1, 68.1, 68.4], [68.4, 69.6, 68.3, 69.4]] },
-      { name: "Ethereum", symbol: "ETH", share: 0.28, change: "-0.6%", ohlc: [[3.52, 3.58, 3.44, 3.47], [3.47, 3.55, 3.4, 3.53], [3.53, 3.56, 3.38, 3.41], [3.41, 3.5, 3.36, 3.48], [3.48, 3.51, 3.39, 3.43], [3.43, 3.49, 3.37, 3.46], [3.46, 3.52, 3.42, 3.44]] },
-      { name: "Solana", symbol: "SOL", share: 0.14, change: "+5.8%", ohlc: [[142, 149, 139, 147], [147, 151, 141, 143], [143, 156, 142, 154], [154, 158, 147, 149], [149, 162, 148, 160], [160, 166, 155, 157], [157, 171, 156, 168]] },
-    ],
-    stocks: { days: ["Mon", "Tue", "Wed", "Thu", "Fri"], values: [2.5, 1.8, 4.2, 2.9, 5.1] },
-  };
+async function fetchRealBentoData(force = false) {
+  try {
+    const res = await fetch(`/api/bento/data${force ? '?force=true' : ''}`);
+    if (res.ok) {
+      latestBentoData = await res.json();
+      return latestBentoData;
+    }
+  } catch (e) {
+    console.error("Falha ao sincronizar Bento com API:", e);
+  }
+  return null;
 }
 
-function renderFinanceBento() {
+async function renderFinanceBento(force = false) {
   const container = document.getElementById('financeBentoRoot');
   if (!container) return;
+
+  if (!latestBentoData || force) {
+    if (!latestBentoData) {
+      container.innerHTML = `
+        <div class="fpb-c canvas flex flex-col items-center justify-center p-16 text-slate-400 space-y-3">
+          <div class="w-8 h-8 border-2 border-binance border-t-transparent rounded-full animate-spin"></div>
+          <div class="font-medium text-white text-base">Sincronizando Finance Bento com mercado real...</div>
+          <div class="text-xs text-slate-400">Consultando Binance, Alpaca e B3 Nuvem sem dados fictícios</div>
+        </div>`;
+    }
+    const realData = await fetchRealBentoData(force);
+    if (!realData && !latestBentoData) {
+      container.innerHTML = `<div class="p-8 text-center text-rose-400 font-medium">Erro ao carregar dados reais do servidor. Verifique se o backend está online.</div>`;
+      return;
+    }
+  }
+
+  const data = latestBentoData;
+  if (!data) return;
 
   if (bentoUnmount) {
     try { bentoUnmount(); } catch (e) {}
     bentoUnmount = null;
   }
 
-  const data = getLiveBentoData();
   const avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80';
 
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -1713,7 +1699,7 @@ function renderFinanceBento() {
 
   container.innerHTML = markup({
     title: "Trader Skill Overview",
-    subtitle: "Multi-Broker Quant Portfolio",
+    subtitle: "Multi-Broker Quant Portfolio (Real 24/7)",
     avatar: avatarUrl,
     avatarAlt: "Trader",
     credit: false
@@ -1920,7 +1906,7 @@ function mountBento(root, data) {
     <svg class="cst" width="100%" height="22" style="position:absolute;left:24px;right:24px;bottom:22px;width:calc(100% - 48px)" aria-hidden="true"></svg></div>`;
 
   function updateCash() {
-    const v = nwData[nwData.length - 1].fiat * 0.42, mo = v / 2100; tween(cash.querySelector('.csv'), v, x => money(x)); tween(cash.querySelector('.crw'), mo, x => x.toFixed(1));
+    const v = nwData[nwData.length - 1].fiat, budgetTarget = (data.goals && data.goals[1]?.target) || 100.0, mo = v / Math.max(10, budgetTarget); tween(cash.querySelector('.csv'), v, x => money(x)); tween(cash.querySelector('.crw'), mo, x => x.toFixed(1));
     const svg = cash.querySelector('.cst'), W = svg.getBoundingClientRect().width || 220, n = 36; let s = '';
     for (let i = 0; i < n; i++) {
       const x = 1 + i * (W - 2) / (n - 1), on = i / (n - 1) <= mo / 12;
@@ -1957,7 +1943,7 @@ function mountBento(root, data) {
   // Flow Card
   const flow = $id('flow');
   flow.innerHTML = `${bg(GR.pink)}<div class="in-c">
-    <div class="row" style="justify-content:space-between"><div><div class="ttl">Cash flow & Lucro Quant</div><div class="muted" style="margin-top:4px">Net <span class="mono" style="color:${ACC}">+$3,240</span> a month</div></div>
+    <div class="row" style="justify-content:space-between"><div><div class="ttl">Cash flow & Lucro Quant</div><div class="muted" style="margin-top:4px">Fluxo Líquido <span class="mono" style="color:${ACC}">${(() => { const net = INC[0]?.length ? ((INC[0].reduce((a, b) => a + b, 0) - SPN[0].reduce((a, b) => a + b, 0)) / INC[0].length) * 1000 : 0; return (net >= 0 ? "+" : "") + money(net) + " /mês"; })()}</span></div></div>
       <div class="legend" style="flex-direction:column;gap:4px;align-items:flex-end"><span><i style="background:#fff"></i>Entradas/Ganhos</span><span><i style="background:#FFD0E6"></i>Execuções/Custos</span></div></div>
     <svg class="fls" style="position:absolute;left:0;bottom:12px" aria-hidden="true"></svg></div><div class="rim"></div>`;
   const MLAB = data.cashflow.months, INC = data.cashflow.income, SPN = data.cashflow.spending;
@@ -2014,7 +2000,7 @@ function mountBento(root, data) {
   const CHG = data.crypto.map(a => a.change);
 
   function updateCrypto() {
-    const v = nwData[nwData.length - 1].crypto; tween(cr.querySelector('.crv'), v, x => money(x)); cr.querySelector('.crd').textContent = '↑ 2.4%';
+    const v = nwData[nwData.length - 1].crypto; tween(cr.querySelector('.crv'), v, x => money(x)); const avgChg = data.crypto.length ? data.crypto[0].change : '+0.0%'; cr.querySelector('.crd').textContent = avgChg; cr.querySelector('.crd').style.color = avgChg.startsWith('+') ? ACC : T3;
     cr.querySelector('.crb').innerHTML = `<div style="display:flex;gap:3px;height:6px">${CA.map(([n, s, f], i) => `<div style="flex:0 0 calc(${f * 100}% - 2px);border-radius:3px;background:rgba(255,255,255,${[0.95, 0.6, 0.32][i]});transform-origin:left;transform:scaleX(0);transition:transform .8s var(--ease) ${0.1 + i * 0.1}s" class="crs"></div>`).join('')}</div>
       <div style="display:flex;gap:3px;margin-top:7px">${CA.map(([n, s, f]) => `<span class="mono muted" style="flex:0 0 calc(${f * 100}% - 2px);font-size:11px;white-space:nowrap">${s} ${Math.round(f * 100)}%</span>`).join('')}</div>`;
     RAF(() => RAF(() => cr.querySelectorAll('.crs').forEach(b => b.style.transform = 'scaleX(1)')));
@@ -2027,7 +2013,7 @@ function mountBento(root, data) {
   const st = $id('stocks');
   const WK = data.stocks.days, WV = data.stocks.values;
   st.innerHTML = `${bg(GR.green)}<div class="in-c"><div class="ttl">Stocks (US & B3)</div>
-    <div style="margin-top:14px"><span class="big stv" style="font-size:34px">0</span></div><div class="row" style="margin-top:6px;gap:8px"><span class="delta">↑ 1.8%</span><span class="muted">this week</span></div>
+    <div style="margin-top:14px"><span class="big stv" style="font-size:34px">0</span></div><div class="row" style="margin-top:6px;gap:8px"><span class="delta">${money(WV.reduce((a, b) => a + b, 0) * 1000)}</span><span class="muted">volume semanal</span></div>
     <svg class="sts" style="position:absolute;left:18px;bottom:14px" aria-hidden="true"></svg></div><div class="rim"></div>`;
 
   function updateStocks(instant) {
