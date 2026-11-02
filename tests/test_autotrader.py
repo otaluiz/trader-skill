@@ -16,6 +16,7 @@ from trader_engine.strategy import StrategyEngine
 class TestAutoTraderAndControls(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        self.client.post("/api/auth/google/demo-login")
         self.trade_mgr = TradeManager()
         self.strategy_engine = StrategyEngine()
         self.auto_trader = AutoTrader(self.trade_mgr, self.strategy_engine)

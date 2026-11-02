@@ -6,6 +6,7 @@ from backend.main import app
 class TestBackendAPI(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        self.client.post("/api/auth/google/demo-login")
 
     def test_health_endpoint(self):
         res = self.client.get("/api/health")

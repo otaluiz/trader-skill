@@ -156,10 +156,14 @@ class GoogleAuthManager:
 
     def create_demo_user(self) -> Dict:
         """Creates a demonstration Google user profile for sandbox testing."""
+        cfg = self.trade_mgr.load_config()
+        allowed = cfg.get("google_allowed_emails", [])
+        email = allowed[0] if allowed else "otalogia@gmail.com"
+        name = "Luiz (Otalogia)" if "otalogia" in email else "Luiz Trader"
         return {
             "id": "google-demo-user-10928374",
-            "email": "luiz.trader@gmail.com",
-            "name": "Luiz Trader",
+            "email": email,
+            "name": name,
             "picture": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80",
             "provider": "google_demo",
             "verified_at": int(time.time())

@@ -107,6 +107,14 @@ class TestGoogleAuth(unittest.TestCase):
         )
         self.assertNotEqual(resp_authed.status_code, 401)
 
+    def test_configured_email_otalogia(self):
+        user = self.auth_mgr.create_demo_user()
+        self.assertEqual(user["email"], "otalogia@gmail.com")
+
+        resp = self.client.post("/api/auth/google/demo-login")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["user"]["email"], "otalogia@gmail.com")
+
     def test_logout_endpoint(self):
         resp = self.client.post("/api/auth/logout")
         self.assertEqual(resp.status_code, 200)

@@ -43,9 +43,11 @@
   "allow_crypto": true,
   "allow_b3": true,
   "allow_options": false,
-  "google_auth_enabled": false,
+  "google_auth_enabled": true,
   "google_client_id": "",
   "google_client_secret": "",
-  "google_allowed_emails": [],
+  "google_allowed_emails": [
+    "otalogia@gmail.com"
+  ],
   "jwt_secret_key": "95a32f5dd62d48695de226c7ef4590a3443defdc0aa3747c71107b076ab56631"
 }
