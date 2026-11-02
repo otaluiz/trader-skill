@@ -43,3 +43,5 @@ Thumbs.db
 *.log
 .system_generated/
 scratch/
+*.local.json
+trader/config.local.json

@@ -24,6 +24,7 @@ import check as risk_check
 import ticket as broker_ticket
 
 CONFIG_PATH = os.path.join("trader", "config.json")
+CONFIG_LOCAL_PATH = os.path.join("trader", "config.local.json")
 TICKETS_STATE_PATH = os.path.join("trader", "state", "tickets.json")
 PRICES_PATH = os.path.join("trader", "prices.json")
 PORTFOLIO_PATH = os.path.join("trader", "portfolio.json")
@@ -98,17 +99,49 @@ class TradeManager:
 
     def load_config(self) -> Dict:
         try:
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                cfg = dict(DEFAULT_CONFIG)
-                cfg.update(json.load(f))
-                return cfg
+            cfg = dict(DEFAULT_CONFIG)
+            if os.path.exists(CONFIG_PATH):
+                with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                    cfg.update(json.load(f))
+            if os.path.exists(CONFIG_LOCAL_PATH):
+                try:
+                    with open(CONFIG_LOCAL_PATH, "r", encoding="utf-8") as lf:
+                        cfg.update(json.load(lf))
+                except Exception:
+                    pass
+            # Environment variables override
+            if os.environ.get("GOOGLE_CLIENT_ID"):
+                cfg["google_client_id"] = os.environ["GOOGLE_CLIENT_ID"].strip()
+            if os.environ.get("GOOGLE_CLIENT_SECRET"):
+                cfg["google_client_secret"] = os.environ["GOOGLE_CLIENT_SECRET"].strip()
+            return cfg
         except Exception:
             return dict(DEFAULT_CONFIG)
 
     def save_config(self, new_cfg: Dict):
         self.config.update(new_cfg)
+        # Separate private local secrets from public config
+        secret_keys = ["google_client_id", "google_client_secret", "binance_api_key", "binance_api_secret", "alpaca_api_key", "alpaca_api_secret", "b3_api_key", "b3_api_secret", "b3_api_token"]
+        local_secrets = {k: self.config[k] for k in secret_keys if k in self.config and self.config[k]}
+        if local_secrets:
+            try:
+                existing_local = {}
+                if os.path.exists(CONFIG_LOCAL_PATH):
+                    with open(CONFIG_LOCAL_PATH, "r", encoding="utf-8") as lf:
+                        existing_local = json.load(lf)
+                existing_local.update(local_secrets)
+                with open(CONFIG_LOCAL_PATH, "w", encoding="utf-8") as lf:
+                    json.dump(existing_local, lf, indent=2)
+            except Exception:
+                pass
+
+        public_config = dict(self.config)
+        for k in ["google_client_id", "google_client_secret"]:
+            if k in public_config and public_config[k]:
+                public_config[k] = ""  # Keep empty in version control to prevent push protection rejection
+
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(self.config, f, indent=2)
+            json.dump(public_config, f, indent=2)
 
     def get_binance_connector(self) -> BinanceConnector:
         cfg = self.load_config()
