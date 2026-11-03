@@ -114,6 +114,26 @@ class TradeManager:
                 cfg["google_client_id"] = os.environ["GOOGLE_CLIENT_ID"].strip()
             if os.environ.get("GOOGLE_CLIENT_SECRET"):
                 cfg["google_client_secret"] = os.environ["GOOGLE_CLIENT_SECRET"].strip()
+            if os.environ.get("GOOGLE_AUTH_ENABLED"):
+                cfg["google_auth_enabled"] = os.environ["GOOGLE_AUTH_ENABLED"].strip().lower() in ("true", "1", "yes")
+            if os.environ.get("GOOGLE_ALLOWED_EMAILS"):
+                cfg["google_allowed_emails"] = [e.strip() for e in os.environ["GOOGLE_ALLOWED_EMAILS"].split(",") if e.strip()]
+            if os.environ.get("JWT_SECRET_KEY"):
+                cfg["jwt_secret_key"] = os.environ["JWT_SECRET_KEY"].strip()
+            if os.environ.get("BINANCE_API_KEY"):
+                cfg["binance_api_key"] = os.environ["BINANCE_API_KEY"].strip()
+            if os.environ.get("BINANCE_API_SECRET"):
+                cfg["binance_api_secret"] = os.environ["BINANCE_API_SECRET"].strip()
+            if os.environ.get("ALPACA_API_KEY"):
+                cfg["alpaca_api_key"] = os.environ["ALPACA_API_KEY"].strip()
+            if os.environ.get("ALPACA_API_SECRET"):
+                cfg["alpaca_api_secret"] = os.environ["ALPACA_API_SECRET"].strip()
+            if os.environ.get("B3_API_KEY"):
+                cfg["b3_api_key"] = os.environ["B3_API_KEY"].strip()
+            if os.environ.get("B3_API_SECRET"):
+                cfg["b3_api_secret"] = os.environ["B3_API_SECRET"].strip()
+            if os.environ.get("B3_API_TOKEN"):
+                cfg["b3_api_token"] = os.environ["B3_API_TOKEN"].strip()
             return cfg
         except Exception:
             return dict(DEFAULT_CONFIG)

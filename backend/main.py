@@ -44,6 +44,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Enables smooth cross-window postMessage communication for Google OAuth popups."""
+    response = await call_next(request)
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+    return response
+
 # Initialize engines
 trade_mgr = TradeManager()
 strategy_engine = StrategyEngine()
