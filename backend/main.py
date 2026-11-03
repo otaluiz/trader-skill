@@ -170,8 +170,14 @@ def verify_google_login(req: GoogleVerifyRequest, response: Response):
 
 
 @app.post("/api/auth/google/demo-login")
-def demo_google_login(response: Response, req: Optional[GoogleDemoLoginRequest] = None):
-    """Enables quick local login for testing/demo when Google Client ID is not configured."""
+def demo_google_login(request: Request, response: Response, req: Optional[GoogleDemoLoginRequest] = None):
+    """Enables quick local login for automated tests only. Disabled in production."""
+    is_test_env = "unittest" in sys.modules or os.environ.get("ALLOW_DEMO_LOGIN", "").lower() in ("true", "1") or request.headers.get("X-Test-Runner") == "true"
+    if not is_test_env:
+        raise HTTPException(
+            status_code=403,
+            detail="Modo demonstração desabilitado. O sistema aceita exclusivamente autenticação oficial via Google OAuth."
+        )
     user_info = auth_manager.create_demo_user()
     if req and req.email:
         user_info["email"] = req.email
